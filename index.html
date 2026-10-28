@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Asphalt QC Field System</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<!-- 1. Slide-Out Drawer & Dark Backdrop Overlay -->
+<div id="drawer-overlay" class="drawer-overlay" onclick="toggleDrawer(false)"></div>
+<aside id="nav-drawer" class="nav-drawer"></aside>
+<!-- 2. Header with Hamburger Menu Button -->
+<header>
+  <div class="top-bar">
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <button class="btn-icon" onclick="toggleDrawer(true)" title="Menu">☰</button>
+      <div class="logo">QC FIELD ENGINE</div>
+    </div>
+    <div class="badge">OFFLINE READY</div>
+  </div>
+</header>
+<!-- 3. Toolbar -->
+<div class="toolbar">
+  <div id="context-bar"></div>
+  <div class="mode-selector">
+    <button class="mode-btn" data-mode="INTERACTIVE" onclick="setMode('INTERACTIVE')">Step Wizard</button>
+    <button class="mode-btn active" data-mode="SPEED" onclick="setMode('SPEED')">Speed Sheet</button>
+  </div>
+</div>
+<!-- 4. Main Workspaces Viewport -->
+<main>
+  <div class="container" id="app-viewport"></div>
+</main>
+<!-- 5. Scripts: Database ──► Domain ──► Policies ──► Calculations ──► Navigation ──► Controls ──► Screens -->
+<script src="js/asphalt-tests.js"></script>
+<script src="js/qc-database.js"></script>
+<script src="js/qc-policies.js"></script>
+<script src="js/qc-calculations.js"></script>
+<script src="js/qc-navigation.js"></script>
+<script src="js/qc-inspector.js"></script>
+<script src="js/qc-screens.js"></script>
+</body>
+</html>

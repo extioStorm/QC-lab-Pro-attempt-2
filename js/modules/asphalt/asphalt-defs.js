@@ -18,7 +18,6 @@ const TestDefinitions = {
     sequence: [
       {
         key: "bowlCalibrationWeight",
-        section: "prereq",
         label: "Empty Bowl Underwater (B)",
         type: "computed",
         fetch: "bowlCalibration",
@@ -29,7 +28,6 @@ const TestDefinitions = {
       },
       {
         key: "drybackCorrection",
-        section: "prereq",
         label: "Dryback Correction",
         type: "computed",
         fetch: "drybackCorrection",
@@ -107,7 +105,6 @@ const TestDefinitions = {
     sequence: [
       {
         key: "riceTestId",
-        section: "prereq",
         label: "Rice Test for This Pill",
         type: "choice",
         resolver: "pillRice",
@@ -115,7 +112,6 @@ const TestDefinitions = {
       },
       {
         key: "riceGmm",
-        section: "prereq",
         label: "Rice Gmm (this sample)",
         type: "computed",
         from: ["riceTestId"],
@@ -202,7 +198,6 @@ const TestDefinitions = {
       {
         key: "transitMinutes",
         home: "plant",
-        section: "prereq",
         label: "Haul Time, Plant to Job",
         type: "input",
         unit: "min",
@@ -214,7 +209,6 @@ const TestDefinitions = {
       {
         key: "designGmm",
         home: "mix",
-        section: "prereq",
         label: "Mix Design Gmm (fallback)",
         type: "input",
         unit: "",
@@ -225,7 +219,6 @@ const TestDefinitions = {
       },
       {
         key: "riceChoice",
-        section: "prereq",
         label: "Rice Test for This Core",
         type: "choice",
         resolver: "coreRice",
@@ -233,7 +226,6 @@ const TestDefinitions = {
       },
       {
         key: "targetRiceGmm",
-        section: "prereq",
         label: "Target Rice Gmm",
         type: "computed",
         from: ["laydownTimestamp", "transitMinutes", "designGmm", "riceChoice"],

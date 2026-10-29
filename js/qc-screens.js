@@ -219,7 +219,7 @@ function buildDependencyLinks(step, inline = true) {
   return box.children.length ? box : null;
 }
 
-// Renders the generic collapsed prerequisite header if any steps are marked section: "prereq"
+// Renders the generic collapsed prerequisite header
 function renderPrereqSection(prereqSteps, record) {
   const details = document.createElement("details");
   details.className = "prereq-card";
@@ -298,8 +298,10 @@ function renderSpeedMode(container) {
   card.className = "card";
   card.innerHTML = `<div class="card-title">⚡ Speed Sheet — ${testDef.title.toUpperCase()} #${Nav.activeTestId}</div>`;
 
-  const prereqSteps = testDef.sequence.filter(s => s.section === "prereq");
-  const mainSteps = testDef.sequence.filter(s => s.section !== "prereq");
+  // NEW LOGIC: Ask the structure, don't look for metadata!
+  const isPrereq = s => s.home || s.fetch || s.resolver;
+  const prereqSteps = testDef.sequence.filter(isPrereq);
+  const mainSteps = testDef.sequence.filter(s => !isPrereq(s));
 
   // Render collapsible prerequisite box at the top if any exist
   if (prereqSteps.length > 0) {
@@ -322,9 +324,14 @@ function renderWizardMode(container) {
   const record = getActiveRecord();
   const testDef = TestDefinitions[Nav.activeTestType];
   if (!record || !testDef) return;
-  const steps = testDef.sequence;
+  
+  // NEW LOGIC: Only grab local steps, ignoring external pointers
+  const steps = testDef.sequence.filter(s => !s.home && !s.fetch && !s.resolver);
+  if (steps.length === 0) return; // Failsafe
+  
   const stepIndex = Math.min(Nav.stepIndex, steps.length - 1);
   const step = steps[stepIndex];
+  
   const card = document.createElement("div");
   card.className = "card";
   card.innerHTML = `

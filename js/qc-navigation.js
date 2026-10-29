@@ -94,15 +94,19 @@ function navigateTo(target, { keepDrawer = false } = {}) {
   saveToStorage();
   renderScreen();
 }
+
 // Jump to an input step of the test on screen (wizard: that step; speed sheet: scroll to its row).
 function jumpToStep(stepKey) {
   const def = TestDefinitions[Nav.activeTestType];
-  const index = def ? def.sequence.findIndex(s => s.key === stepKey) : -1;
+  // Match the structural logic of the Wizard UI!
+  const mainSteps = def ? def.sequence.filter(s => !s.home && !s.fetch && !s.resolver) : [];
+  const index = mainSteps.findIndex(s => s.key === stepKey);
   if (index < 0) return;
   navigateTo({ stepIndex: index });
   const row = document.querySelector(`[data-step-row="${stepKey}"]`);
   if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
 }
+
 // "Select this record at this level": its id, plus whatever the tree config says to reset below it (clearNav).
 function selectionTarget(level, id) {
   const def = DatabaseMap.entities[level];

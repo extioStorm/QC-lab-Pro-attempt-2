@@ -93,22 +93,18 @@ function focusInspectorDependency(key) {
   const step = stepOf(Nav.activeTestType, key);
   if (!step) return;
 
-  // Inputs stored on another level and fetched outputs live in the Speed Sheet's
-  // prerequisite section; the Wizard intentionally omits those rows.
+  const test = TestDefinitions[Nav.activeTestType];
+  let stepIndex = 0;
   if (step.home || step.fetch || step.resolver) {
-    navigateTo({ mode: "SPEED", stepIndex: 0 });
+    Nav.mode = "SPEED";
   } else if (Nav.mode === "INTERACTIVE") {
-    const steps = TestDefinitions[Nav.activeTestType].sequence
-      .filter(item => !item.home && !item.fetch && !item.resolver);
-    const index = steps.findIndex(item => item.key === key);
-    navigateTo({ stepIndex: Math.max(0, index) });
-  } else {
-    // Re-render to close the old Inspector before opening the destination.
-    navigateTo({ stepIndex: 0 });
+    stepIndex = test.sequence.filter(s => !s.home && !s.fetch && !s.resolver)
+      .findIndex(s => s.key === key);
   }
+  navigateTo({ mode: Nav.mode, stepIndex: Math.max(0, stepIndex) });
 
-  const rows = [...document.querySelectorAll("[data-step-row]")];
-  const row = rows.find(el => el.dataset.stepRow === key);
+  const row = [...document.querySelectorAll("[data-step-row]")]
+    .find(el => el.dataset.stepRow === key);
   const details = row && row.closest("details");
   if (details) details.open = true;
   if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -118,14 +114,10 @@ function focusInspectorDependency(key) {
   if (step.type === "computed" && calc) {
     const card = calc.closest(".speed-card") || calc.closest(".card");
     if (card) toggleInspector(key, card);
-    return;
-  }
-
-  const control = (row && row.querySelector("input, select, textarea")) ||
-    document.querySelector("input, select, textarea");
-  if (control) {
-    control.focus({ preventScroll: true });
-    if (control.scrollIntoView) control.scrollIntoView({ behavior: "smooth", block: "center" });
+  } else {
+    const control = (row && row.querySelector("input, select, textarea")) ||
+      document.querySelector("input, select, textarea");
+    if (control) control.focus({ preventScroll: true });
   }
 }
 

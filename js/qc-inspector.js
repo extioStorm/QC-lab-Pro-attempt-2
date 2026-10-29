@@ -68,6 +68,83 @@ function updateCalculatedDisplays() {
   });
 }
 
+
+function directInspectorDependencies(step) {
+  const dependencies = [];
+  const seen = new Set();
+  (step && step.from || []).forEach(key => {
+    const id = Nav.activeTestType + "." + key;
+    if (!seen.has(id)) {
+      seen.add(id);
+      dependencies.push({ type: Nav.activeTestType, key });
+    }
+  });
+  readsOf(step).forEach(read => {
+    const id = read.type + "." + read.key;
+    if (!seen.has(id)) {
+      seen.add(id);
+      dependencies.push({ type: read.type, key: read.key });
+    }
+  });
+  return dependencies;
+}
+
+function focusInspectorDependency(key) {
+  const step = stepOf(Nav.activeTestType, key);
+  if (!step) return;
+
+  // Inputs stored on another level and fetched outputs live in the Speed Sheet's
+  // prerequisite section; the Wizard intentionally omits those rows.
+  if (step.home || step.fetch || step.resolver) {
+    navigateTo({ mode: "SPEED", stepIndex: 0 });
+  } else if (Nav.mode === "INTERACTIVE") {
+    const steps = TestDefinitions[Nav.activeTestType].sequence
+      .filter(item => !item.home && !item.fetch && !item.resolver);
+    const index = steps.findIndex(item => item.key === key);
+    navigateTo({ stepIndex: Math.max(0, index) });
+  } else {
+    // Re-render to close the old Inspector before opening the destination.
+    navigateTo({ stepIndex: 0 });
+  }
+
+  const rows = [...document.querySelectorAll("[data-step-row]")];
+  const row = rows.find(el => el.dataset.stepRow === key);
+  const details = row && row.closest("details");
+  if (details) details.open = true;
+  if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+
+  const calc = [...document.querySelectorAll("[data-calc]")]
+    .find(el => el.getAttribute("data-calc") === key);
+  if (step.type === "computed" && calc) {
+    const card = calc.closest(".speed-card") || calc.closest(".card");
+    if (card) toggleInspector(key, card);
+    return;
+  }
+
+  const control = (row && row.querySelector("input, select, textarea")) ||
+    document.querySelector("input, select, textarea");
+  if (control) {
+    control.focus({ preventScroll: true });
+    if (control.scrollIntoView) control.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
+function navigateToInspectorDependency(type, key, fromKey) {
+  if (type === Nav.activeTestType) {
+    focusInspectorDependency(key);
+    return;
+  }
+
+  const context = getActiveContext();
+  const sourceStep = stepOf(Nav.activeTestType, fromKey);
+  const resolver = sourceStep && sourceStep.fetch && SourceResolvers[sourceStep.fetch];
+  const where = resolver && resolver.locate ? resolver.locate(context) : null;
+  if (!where) return;
+
+  goToSource(where, context);
+  focusInspectorDependency(key);
+}
+
 function toggleInspector(outputKey, cardEl) {
   const existingDrawer = cardEl.querySelector(".dependency-box");
   if (existingDrawer) {
@@ -81,8 +158,6 @@ function toggleInspector(outputKey, cardEl) {
   const step = findStep(outputKey);
   const isManual = fieldObj.isManual;
   const currentVal = fieldObj.manual !== null ? fieldObj.manual : "";
-  const up = traceLabels(trace(Nav.activeTestType, outputKey, "up"));
-  const down = traceLabels(trace(Nav.activeTestType, outputKey, "down"));
 
   const drawer = document.createElement("div");
   drawer.className = "dependency-box";
@@ -112,7 +187,8 @@ function toggleInspector(outputKey, cardEl) {
   drawer.innerHTML = `
     <div class="dependency-title">🔍 Inspect: ${outputKey}</div>
     <div class="dependency-detail">Status: <strong>${isManual ? "🟡 Manual Override Active" : "🟢 Auto Calculated"}</strong></div>
-    <div class="dependency-detail">Uses: ${up.length ? up.join(", ") : "—"}<br>Used by: ${down.length ? down.join(", ") : "—"}</div>
+    <div class="dependency-detail"><strong>Direct dependencies</strong></div>
+    <div class="dependency-direct-list"></div>
     ${sourceHtml}
     <div style="margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--panel-border);">
       <label style="font-size:0.8rem;">Manual Override Value:</label>
@@ -127,8 +203,21 @@ function toggleInspector(outputKey, cardEl) {
     </div>
   `;
 
-  const source = buildDependencyLinks(step, false);
-  if (source) drawer.appendChild(source);
+  const dependencyList = drawer.querySelector(".dependency-direct-list");
+  directInspectorDependencies(step).forEach(dep => {
+    const depStep = stepOf(dep.type, dep.key);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn-secondary";
+    button.style.cssText = "display:block;width:100%;text-align:left;margin-top:0.35rem;";
+    button.textContent = (depStep ? depStep.label : dep.key) +
+      (dep.type !== Nav.activeTestType ? " · " + ((TestDefinitions[dep.type] || {}).title || dep.type) : "");
+    button.onclick = () => navigateToInspectorDependency(dep.type, dep.key, outputKey);
+    dependencyList.appendChild(button);
+  });
+  if (!dependencyList.children.length) {
+    dependencyList.textContent = "No declared dependencies.";
+  }
   cardEl.appendChild(drawer);
 }
 

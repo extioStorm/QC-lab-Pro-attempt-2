@@ -149,14 +149,20 @@ function focusInspectorDependency(key) {
   Nav.mode = "SPEED";
   navigateTo({ mode: "SPEED", stepIndex: 0 });
 
-  const row = [...document.querySelectorAll("[data-step-row]")]
-    .find(el => el.dataset.stepRow === key);
-  const details = row && row.closest("details");
-  if (details) details.open = true;
-  if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
-
+  const rows = [...document.querySelectorAll("[data-step-row]")]
+    .filter(el => el.dataset.stepRow === key);
   const calc = [...document.querySelectorAll("[data-calc]")]
     .find(el => el.getAttribute("data-calc") === key);
+  const controlRow = rows.find(el => el.querySelector("input, select, textarea"));
+  const calcRow = calc && calc.closest("[data-step-row]");
+  const row = calcRow && rows.includes(calcRow) ? calcRow : (controlRow || rows[0]);
+
+  // Open every accordion containing the target before scrolling or focusing it.
+  for (let parent = row && row.parentElement; parent; parent = parent.parentElement) {
+    if (parent.matches("details")) parent.open = true;
+  }
+  if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+
   if (step.type === "computed" && calc) {
     const card = calc.closest(".speed-card") || calc.closest(".card");
     if (card) toggleInspector(key, card);

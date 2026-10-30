@@ -10,6 +10,8 @@
   --warning: #d69e2e;
   --danger: #c53030;
   --input-bg: #090a0c;
+  --accent-soft: rgba(49, 130, 206, 0.12);  /* tinted backgrounds: selected rows, prerequisite and inspector boxes */
+  --accent-line: rgba(49, 130, 206, 0.3);   /* tinted borders and pressed rows */
 }
 * {
   box-sizing: border-box;
@@ -73,24 +75,6 @@ header {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-}
-.project-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-.project-meta input {
-  background: var(--input-bg);
-  border: 1px solid var(--panel-border);
-  color: var(--text);
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
-  font-weight: 700;
-  width: 140px;
-  font-size: 0.95rem;
-  text-align: right;
 }
 #context-bar {
   display: flex;
@@ -161,7 +145,8 @@ label {
   font-weight: 600;
 }
 input[type="number"],
-input[type="text"] {
+input[type="text"],
+input[type="datetime-local"] {
   background: var(--input-bg);
   border: 1.5px solid var(--panel-border);
   color: var(--text);
@@ -178,7 +163,7 @@ input:focus {
   background: #000;
 }
 .value-display {
-  background: #0d1117;
+  background: var(--input-bg);
   border: 1px solid var(--panel-border);
   padding: 1.25rem;
   border-radius: 10px;
@@ -249,11 +234,15 @@ input:focus {
   cursor: pointer;
   padding: 0.2rem 0.5rem;
 }
+.speed-calc-val.static { cursor: default; }      /* a summary value, not tappable */
+.speed-calc-val.neutral { color: var(--text); }  /* a count, not a result */
+.speed-calc-val.is-manual, .value-display .val.is-manual { color: var(--warning); } /* a hand-typed override is showing */
+.speed-card.inset { margin-bottom: 0.35rem; background: var(--input-bg); }
 
 /* Collapsible Prerequisite Card */
 .prereq-card {
-  background: rgba(49, 130, 206, 0.08);
-  border: 1px solid rgba(49, 130, 206, 0.3);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
   border-radius: 10px;
   margin-bottom: 0.85rem;
   overflow: hidden;
@@ -297,7 +286,7 @@ details[open] .prereq-arrow {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  border-top: 1px solid rgba(49, 130, 206, 0.2);
+  border-top: 1px solid var(--accent-line);
   margin-top: 0.25rem;
   padding-top: 0.65rem;
 }
@@ -305,7 +294,7 @@ details[open] .prereq-arrow {
 .dependency-box {
   margin-top: 0.75rem;
   padding: 0.85rem;
-  background: rgba(49, 130, 206, 0.12);
+  background: var(--accent-soft);
   border: 1px solid var(--accent);
   border-radius: 8px;
 }
@@ -323,7 +312,8 @@ details[open] .prereq-arrow {
 }
 .btn-primary,
 .btn-secondary,
-.btn-action {
+.btn-action,
+.btn-danger {
   height: 46px;
   border-radius: 8px;
   font-weight: 700;
@@ -336,6 +326,11 @@ details[open] .prereq-arrow {
 .btn-primary { background: var(--accent); color: white; border: none; flex: 1; }
 .btn-secondary { background: transparent; color: var(--muted); border: 1px solid var(--panel-border); flex: 1; }
 .btn-action { width: 100%; border: 1px solid var(--accent); background: var(--input-bg); color: var(--accent); }
+.btn-danger { width: 100%; background: transparent; border: 1px solid var(--danger); color: var(--danger); margin-top: 0.5rem; }
+.btn-primary.is-manual { background: var(--warning); color: black; }
+/* modifiers */
+.btn-block { width: 100%; margin-top: 0.5rem; flex: none; }
+.btn-small { height: 34px; font-size: 0.78rem; padding: 0 0.65rem; flex: none; }
 .wizard-nav { display: flex; gap: 0.75rem; margin-top: 1rem; }
 .drawer-overlay {
   position: fixed;
@@ -404,10 +399,10 @@ details[open] .prereq-arrow {
   user-select: none;
 }
 .tree-row:active {
-  background: rgba(49, 130, 206, 0.2);
+  background: var(--accent-line);
 }
 .tree-row.active {
-  background: rgba(49, 130, 206, 0.15);
+  background: var(--accent-soft);
   border-left: 3px solid var(--accent);
 }
 .tree-arrow {
@@ -443,18 +438,6 @@ details[open] .prereq-arrow {
 #tree-root:has(.tree-node.is-open) > .tree-add-node {
   display: none;
 }
-input[type="datetime-local"] {
-  background: var(--input-bg);
-  border: 1.5px solid var(--panel-border);
-  color: var(--text);
-  height: 52px;
-  padding: 0 0.85rem;
-  border-radius: 8px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  width: 100%;
-}
-.src-box select,
 .step-select {
   width: 100%;
   min-height: 48px;
@@ -478,3 +461,53 @@ input[type="datetime-local"] {
   color: var(--warning);
   margin-bottom: 0.4rem;
 }
+
+/* Shared text and layout pieces */
+.caption { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; }
+.card-title.accent { color: var(--accent); }
+.dependency-detail.strong { font-weight: 700; }
+.context-bar-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--input-bg);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+}
+.context-title { font-weight: 700; font-size: 0.9rem; }
+.context-bar-inner .btn-action { width: auto; }
+.empty-state { text-align: center; padding: 2rem 1rem; }
+.empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+.empty-state .btn-primary { margin: 0 auto; max-width: 260px; width: 100%; }
+
+/* Navigation drawer */
+#tree-root { padding: 0.5rem 0.35rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.drawer-section { border-top: 1px solid var(--panel-border); margin-top: 1rem; padding: 0.75rem 0.5rem; }
+.section-label { font-size: 0.72rem; color: var(--muted); font-weight: 700; text-transform: uppercase; margin-bottom: 0.5rem; padding: 0 0.5rem; }
+
+/* Inspector drawer */
+.dependency-section,
+.inspector-full-trace {
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--panel-border);
+}
+/* dependency buttons hold long names: let them wrap, left-aligned, and grow in height */
+.dependency-direct-list .btn-secondary,
+.trace-inputs .btn-small { height: auto; min-height: 34px; padding: 0.35rem 0.6rem; text-align: left; justify-content: flex-start; max-width: 100%; }
+.dependency-direct-list .btn-secondary { width: 100%; min-height: 42px; margin-top: 0.35rem; }
+.dependency-source-label { font-size: 0.8rem; font-weight: 700; color: var(--text); }
+.source-view .step-select { margin-top: 0.3rem; }
+.dependency-box .override-input { height: 38px; font-size: 0.95rem; margin: 0.3rem 0; }
+
+/* Inspector: layered full trace */
+.inspector-full-trace summary { cursor: pointer; font-weight: 700; font-size: 0.85rem; }
+.trace-body { margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.65rem; }
+.trace-group { padding: 0.55rem; border: 1px solid var(--panel-border); border-radius: 0.45rem; }
+.trace-level { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.35rem; }
+.trace-inputs { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+.trace-sep, .trace-arrow { color: var(--muted); }
+.trace-arrow { text-align: center; margin: 0.15rem 0; }
+.trace-output { font-weight: 700; font-size: 0.82rem; }
+.trace-final { font-weight: 700; text-align: center; padding: 0.45rem; }

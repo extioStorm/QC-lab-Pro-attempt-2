@@ -13,7 +13,7 @@ const TestDefinitions = {
     id: "rice",
     title: "Rice Test (Gmm)",
     icon: "🍚",
-    database: { parent: "sample", collection: "riceTests", idKey: "riceTestId", create: sample => addRiceTest(sample) },
+    database: { parent: "sample", collection: "riceTests", idKey: "riceTestId" },
     navigation: { group: false, collectionLabel: "Rice Tests", addLabel: "Add Rice Test", itemLabel: (record, id) => `Rice Test #${id}` },
     sequence: [
       {
@@ -100,7 +100,7 @@ const TestDefinitions = {
     id: "pill",
     title: "Gyratory Pill (Gmb)",
     icon: "🔘",
-    database: { parent: "sample", collection: "pills", idKey: "pillId", create: sample => addPill(sample) },
+    database: { parent: "sample", collection: "pills", idKey: "pillId" },
     navigation: { group: false, collectionLabel: "Gyratory Pills", addLabel: "Add Gyratory Pill", itemLabel: (record, id) => `Gyratory Pill #${id}` },
     sequence: [
       {
@@ -184,15 +184,7 @@ const TestDefinitions = {
     id: "core",
     title: "Roadway Core",
     icon: "🔴",
-    database: {
-      parent: "plant",
-      collection: "cores",
-      idKey: "coreId",
-      create: plant => {
-        const nextNum = nextNumber(plant.cores);
-        return addRoadwayCore(plant, `CORE-${String(nextNum).padStart(2, "0")}`);
-      }
-    },
+    database: { parent: "plant", collection: "cores", idKey: "coreId", idPrefix: "CORE-", idPad: 2, defaults: { station: "" } },
     navigation: { group: true, groupIcon: "🛣️", collectionLabel: "Roadway Cores", addLabel: "Log New Roadway Core", itemLabel: (core, id) => `Core ${id} (${core.station || "No Station"})` },
     sequence: [
       {
@@ -309,7 +301,7 @@ const TestDefinitions = {
     id: "bowlCalibration",
     title: "Bowl Calibration",
     icon: "⚖️",
-    database: { parent: "plant", collection: "calibrations", idKey: "calibrationId", create: plant => addBowlCalibration(plant) },
+    database: { parent: "plant", collection: "calibrations", idKey: "calibrationId", idPrefix: "CAL-", idPad: 2 },
     navigation: { group: true, groupIcon: "⚖️", collectionLabel: "Bowl Calibrations", addLabel: "Add Bowl Calibration", itemLabel: (r, id) => `Calibration @ ${shortStamp(r.calibrationDate)}${r.weight ? " · " + Number(r.weight).toFixed(1) + " g" : ""}` },
     sequence: [
       { key: "weight", label: "Empty Bowl Underwater (B)", type: "input", unit: "g", decimals: 1, step: "0.1", instruction: "Submerge empty bowl and record mass." },
@@ -320,8 +312,8 @@ const TestDefinitions = {
     id: "drybackCorrection",
     title: "Dryback Correction",
     icon: "💧",
-    database: { parent: "plant", collection: "drybackCorrections", idKey: "drybackId", create: plant => addDrybackCorrection(plant) },
-    navigation: { group: true, groupIcon: "💧", collectionLabel: "Dryback Corrections", addLabel: "Add Dryback Correction", itemLabel: (r, id) => `Correction @ ${shortStamp(r.effectiveDate)}${r.correction !== null && r.correction !== undefined ? " · " + Number(r.correction).toFixed(3) : ""}` },
+    database: { parent: "plant", collection: "drybackCorrections", idKey: "drybackId", idPrefix: "DRY-", idPad: 2, defaults: { correction: DEFAULT_DRYBACK_CORRECTION } },
+    navigation: { group: true, groupIcon: "💧", collectionLabel: "Dryback Corrections", addLabel: "Add Dryback Correction", itemLabel: (r, id) => `Correction @ ${shortStamp(r.effectiveDate)}${hasNumber(r.correction) ?" · " + Number(r.correction).toFixed(3) : ""}` },
     sequence: [
       { key: "correction", label: "Dryback Correction", type: "input", unit: "", decimals: 3, step: "0.001", instruction: "Subtracted from Gmm SSD." },
       { key: "effectiveDate", label: "In Effect From", type: "datetime", autoKey: "isUsingAutoDate", autoValueKey: "systemCreatedAt", autoHint: "automatic", manualHint: "entered", rerender: true, instruction: "Effective date." }

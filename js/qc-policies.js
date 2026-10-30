@@ -11,8 +11,12 @@
                                    (my time - an offset) among an ancestor's records,
                                    else a fallback value; never guess between equals
 
+   Every policy also states where it keeps its own bookkeeping on a record (storeKeys) and what an empty
+   choice looks like (emptyChoice), so a new record can be built from its test definition alone
+   (createTestRecord in qc-database.js).
+
    Nothing here knows about any particular industry: keys, levels and wording all
-   come from the PolicyConfigs the domain file defines (asphalt-tests.js), which must load first.
+   come from the PolicyConfigs the domain module defines (modules/asphalt/asphalt-policies.js), which must load first.
    ========================================================================= */
 
 const MS_PER_MINUTE = 60000;
@@ -27,16 +31,8 @@ function shortStamp(text) {
   return text ? String(text).slice(5).replace("T", " ") : "--";
 }
 
-function isPositiveNumber(v) {
-  return v !== null && v !== undefined && v !== "" && !isNaN(v) && Number(v) > 0;
-}
-
-function isZeroOrMore(v) {
-  return v !== null && v !== undefined && v !== "" && !isNaN(v) && Number(v) >= 0;
-}
-
 /* -------------------------------------------------------------------------
-   POLICY 1: Pick from the same parent (e.g. Pill reads Rice on its own Sample)
+   POLICY 1: Pick from the same parent (e.g. a record reads a value from a sibling record in the same parent)
    ------------------------------------------------------------------------- */
 function createParentPickerPolicy(config) {
   function resolveTarget(ctx) {
@@ -51,6 +47,8 @@ function createParentPickerPolicy(config) {
   }
 
   return {
+    storeKeys: [],
+    emptyChoice: () => null,
     view(ctx) {
       const { items, target, status } = resolveTarget(ctx);
       const options = [], lines = [];
@@ -116,15 +114,15 @@ function createTimeProximityPolicy(config) {
   const L = config.labels, keys = config.matchStoreKeys, d = config.decimals;
 
   function resolveMatch(ctx) {
-    const rec = ctx.record, plant = ctx[config.ancestor], fallback = ctx[config.fallbackLevel];
+    const rec = ctx.record, owner = ctx[config.ancestor], fallback = ctx[config.fallbackLevel];
     const myTime = parseLocalTime(rec ? rec[config.myTimestampKey] : null);
-    const offsetMin = (plant && isZeroOrMore(plant[config.offsetMinutesKey])) ? Number(plant[config.offsetMinutesKey]) : 0;
+    const offsetMin = (owner && isZeroOrMore(owner[config.offsetMinutesKey])) ? Number(owner[config.offsetMinutesKey]) : 0;
     const targetMs = myTime !== null ? myTime - offsetMin * MS_PER_MINUTE : null;
     const fallbackVal = (fallback && isPositiveNumber(fallback[config.fallbackKey])) ? Number(fallback[config.fallbackKey]) : null;
     const choice = (rec && rec[config.choiceKey]) || { mode: "auto" };
 
     const candidates = [];
-    Object.values((plant && plant[config.itemsCollection]) || {}).forEach(item => {
+    Object.values((owner && owner[config.itemsCollection]) || {}).forEach(item => {
       const timeMs = parseLocalTime(item[config.timestampKey]);
       Object.values(item[config.subCollection] || {}).forEach(sub => {
         const val = resolve(sub[config.valueKey]);
@@ -162,6 +160,8 @@ function createTimeProximityPolicy(config) {
   }
 
   return {
+    storeKeys: Object.values(keys || {}),
+    emptyChoice: () => ({ mode: "auto", parentId: null, subId: null }),
     view(ctx) {
       const { targetMs, fallbackVal, choice, candidates, suggested, picked } = resolveMatch(ctx);
       const options = [], lines = [];
@@ -211,8 +211,8 @@ function createTimeProximityPolicy(config) {
     locate(ctx) {
       const res = resolveMatch(ctx);
       if (!res.picked) return null;
-      const plant = ctx[config.ancestor];
-      const item = Object.values((plant && plant[config.itemsCollection]) || {})
+      const owner = ctx[config.ancestor];
+      const item = Object.values((owner && owner[config.itemsCollection]) || {})
         .find(it => String(it[config.parentItemKey]) === String(res.picked.parentId));
       return item ? {
         level: config.itemLevel,
@@ -275,6 +275,8 @@ function createLatestRecordPolicy(config) {
   }
 
   return {
+    storeKeys: config.matchStoreKey ? [config.matchStoreKey] : [],
+    emptyChoice: () => null,
     view(ctx) {
       const { best, all, manualChoice } = pick(ctx);
       const options = [], lines = [];
@@ -284,7 +286,7 @@ function createLatestRecordPolicy(config) {
         all.forEach(c => {
           options.push({
             value: String(c.id),
-            label: `${L.item || "Calibration"} #${c.id} @ ${shortStamp(c.rec[config.timeKey])}`,
+            label: `${L.item || "Record"} #${c.id} @ ${shortStamp(c.rec[config.timeKey])}`,
             selected: manualChoice && String(c.id) === String(best ? best.id : "")
           });
         });

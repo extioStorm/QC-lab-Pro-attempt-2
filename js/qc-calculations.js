@@ -23,6 +23,10 @@ function stepOf(type, key) {
   const def = TestDefinitions[type];
   return def ? def.sequence.find(s => s.key === key) || null : null;
 }
+// Steps that are shown as "prerequisites": values that live elsewhere or are chosen/fetched from another record.
+function isPrereqStep(step) {
+  return Boolean(step && (step.home || step.fetch || step.resolver));
+}
 function valueOf(type, record, ctx, key) {
   const step = stepOf(type, key);
   if (step && step.type === "computed") return resolve(record[key]);
@@ -35,10 +39,9 @@ function computeStep(type, step, record, ctx) {
     raw = SourceResolvers[step.fetch].value(ctx);
   } else if (step.from && typeof step.calc === "function") {
     const vals = step.from.map(k => valueOf(type, record, ctx, k));
-    const ready = vals.every(v => v !== null && v !== undefined && !isNaN(v));
-    raw = ready ? step.calc(...vals) : null;
+    raw = vals.every(hasNumber) ? step.calc(...vals) : null;
   }
-  const next = (raw === null || raw === undefined || isNaN(raw)) ? null : roundHalfToEven(raw, step.decimals);
+  const next = roundHalfToEven(raw, step.decimals);
   const prev = record[step.key] ? record[step.key].auto : null;
   if (record[step.key]) {
     record[step.key].auto = next;
@@ -61,35 +64,6 @@ function recomputeRecord(type, record, ctx) {
     });
   }
   return allChangedKeys;
-}
-// Everything upstream of a value that is still empty and that the user must supply:
-//   { kind: "step",   step }          an input to enter (in this test)
-//   { kind: "source", step, where }   a value fetched from another record that is missing
-function isEmptyValue(v) {
-  return v === null || v === undefined || v === "" || (typeof v === "number" && isNaN(v));
-}
-function missingUpstream(type, key, ctx, seen = new Set()) {
-  const step = stepOf(type, key), record = ctx.record;
-  const id = type + "." + key;
-  if (!step || !record || seen.has(id)) return [];
-  seen.add(id);
-  const out = [];
-  const resolver = step.fetch && SourceResolvers[step.fetch];
-  if (resolver && resolver.locate && isEmptyValue(resolve(record[key]))) {
-    const where = resolver.locate(ctx);
-    if (where) out.push({ kind: "source", step, where });
-  }
-  (step.from || []).forEach(k => {
-    const s = stepOf(type, k);
-    if (!s) return;
-    if (s.type === "computed") {
-      if (isEmptyValue(resolve(record[k]))) out.push(...missingUpstream(type, k, ctx, seen));
-    } else if ((s.type === "input" || s.type === "datetime") && isEmptyValue(valueOf(type, record, ctx, k)) && !seen.has(type + "." + k)) {
-      seen.add(type + "." + k);
-      out.push({ kind: "step", step: s });
-    }
-  });
-  return out;
 }
 function walkRecords(node, obj, ctx, fn) {
   if (!obj) return;
@@ -146,10 +120,33 @@ function propagate(type, record, ctx, seeds = []) {
   }
   recalculateDeclaredViews(ctx);
 }
+// A declared view calculates itself: a custom `calculate(scope, ctx)` when it has one, otherwise from the
+// metrics it declares (see calculateViewMetrics).
+function calculateView(view, scope, ctx) {
+  if (typeof view.calculate === "function") view.calculate(scope, ctx);
+  else calculateViewMetrics(view, scope);
+}
+// Average-type metrics: { key, decimals, average: { path: [collection, ...], field } }.
+// Walks `path` down from the view's parent record, averages every usable (positive) `field` value found,
+// and stores the result under the metric's key. No usable value gives null.
+function calculateViewMetrics(view, scope) {
+  const resultsName = view.resultsCollection || "results";
+  scope[resultsName] = scope[resultsName] || {};
+  (view.metrics || []).filter(metric => metric.average).forEach(metric => {
+    let records = [scope];
+    metric.average.path.forEach(collection => {
+      records = records.flatMap(record => Object.values((record && record[collection]) || {}));
+    });
+    const values = records.map(record => resolve(record[metric.average.field])).filter(isPositiveNumber).map(Number);
+    scope[resultsName][metric.key] = values.length
+      ? roundHalfToEven(values.reduce((sum, value) => sum + value, 0) / values.length, metric.decimals)
+      : null;
+  });
+}
 function recalculateDeclaredViews(ctx) {
   Object.values(DatabaseMap.views || {}).forEach(view => {
     const scope = ctx[view.parent];
-    if (scope && typeof view.calculate === "function") view.calculate(scope, ctx);
+    if (scope) calculateView(view, scope, ctx);
   });
 }
 function propagateHome(level, ctx, key) {
@@ -164,31 +161,75 @@ function propagateChange(type, ctx, key) {
   if (step && step.home) propagateHome(step.home, ctx, key);
   else propagate(type, ctx.record, ctx, [key]);
 }
-function trace(type, key, direction) {
-  const out = [], seen = new Set([type + "." + key]), todo = [{ type, key }];
-  while (todo.length) {
-    const cur = todo.shift();
-    let next;
-    if (direction === "down") {
-      next = (Deps.usedBy[cur.type][cur.key] || []).map(k => ({ type: cur.type, key: k }))
-        .concat((Deps.readers[cur.type] || {})[cur.key] || []);
-    } else {
-      const step = stepOf(cur.type, cur.key) || {};
-      next = (step.from || []).map(k => ({ type: cur.type, key: k }));
-      readsOf(step).forEach(rd => next.push({ type: rd.type, key: rd.key }));
+// What a step directly depends on, as { type, key, relations } entries:
+//   "from"  - the inputs of its formula, or (on a fetched value) the values that choose where it comes from
+//   "reads" - a value it actually reads from another test
+function directDependencies(type, key) {
+  const step = stepOf(type, key);
+  const dependencies = [];
+  const seen = new Map();
+  const add = (depType, depKey, relation) => {
+    const id = depType + "." + depKey;
+    if (seen.has(id)) {
+      const existing = seen.get(id);
+      if (!existing.relations.includes(relation)) existing.relations.push(relation);
+      return;
     }
-    next.forEach(n => {
-      const id = n.type + "." + n.key;
-      if (!seen.has(id)) { seen.add(id); out.push({ type: n.type, key: n.key }); todo.push(n); }
-    });
-  }
-  return out;
+    const dependency = { type: depType, key: depKey, relations: [relation] };
+    seen.set(id, dependency);
+    dependencies.push(dependency);
+  };
+  ((step && step.from) || []).forEach(k => add(type, k, step.fetch ? "source selection" : "calculation"));
+  readsOf(step).forEach(read => add(read.type, read.key, "source value"));
+  return dependencies;
 }
-function traceLabels(list) {
-  return list.map(n => {
-    const s = stepOf(n.type, n.key);
-    return (s ? s.label : n.key) + (n.type !== Nav.activeTestType ? " (" + TestDefinitions[n.type].title + ")" : "");
-  });
+// Everything behind a value, as a graph with each value appearing once:
+//   nodes[]  { id, type, key, dependencies: [{ type, key, relations, node }], depth, route }
+//   root     the node for (type, key)
+// `depth` is how many calculation levels sit under a node (0 = nothing under it). `route` is the chain of
+// { fromType, fromKey, toType, toKey } steps that leads from the starting value to the node, which is what
+// navigation follows to get there.
+function buildDependencyTrace(type, key) {
+  const nodes = new Map();
+
+  function visit(nodeType, nodeKey, route, ancestors) {
+    const id = nodeType + "." + nodeKey;
+    if (ancestors.has(id)) return null;
+
+    let node = nodes.get(id);
+    if (!node) {
+      node = { id, type: nodeType, key: nodeKey, route, dependencies: [], depth: 0 };
+      nodes.set(id, node);
+    }
+    if (node.visited) return node;
+    node.visited = true;
+
+    const nextAncestors = new Set(ancestors);
+    nextAncestors.add(id);
+    directDependencies(nodeType, nodeKey).forEach(dep => {
+      const edge = { fromType: nodeType, fromKey: nodeKey, toType: dep.type, toKey: dep.key };
+      const child = visit(dep.type, dep.key, route.concat(edge), nextAncestors);
+      if (child) node.dependencies.push({ ...dep, node: child });
+    });
+    return node;
+  }
+
+  const root = visit(type, key, [], new Set());
+  const depthOf = (node, visiting = new Set()) => {
+    if (visiting.has(node.id) || !node.dependencies.length) return 0;
+    const next = new Set(visiting);
+    next.add(node.id);
+    node.depth = 1 + Math.max(...node.dependencies.map(dep => depthOf(dep.node, next)));
+    return node.depth;
+  };
+  if (root) depthOf(root);
+  return { root, nodes: [...nodes.values()] };
+}
+// A value's name for the person: its label, plus the test it belongs to when that is not the one on screen.
+function dependencyLabel(type, key) {
+  const step = stepOf(type, key);
+  const test = TestDefinitions[type];
+  return (step ? step.label : key) + (type !== Nav.activeTestType ? " · " + ((test && test.title) || type) : "");
 }
 
 // Tests that read another test's value must be calculated after it.
@@ -207,12 +248,13 @@ function propagateAll(db) {
   });
   jobs.sort((x, y) => typeRank(x.type) - typeRank(y.type));
   jobs.forEach(j => recomputeRecord(j.type, j.record, j.ctx));
-  const done = new Set();
+  const done = new Map();
   jobs.forEach(j => Object.values(DatabaseMap.views || {}).forEach(view => {
     const scope = j.ctx[view.parent];
-    if (scope && !done.has(scope) && typeof view.calculate === "function") {
-      done.add(scope);
-      view.calculate(scope, j.ctx);
+    const doneForView = done.get(view) || done.set(view, new Set()).get(view);
+    if (scope && !doneForView.has(scope)) {
+      doneForView.add(scope);
+      calculateView(view, scope, j.ctx);
     }
   }));
 }

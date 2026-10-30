@@ -64,6 +64,7 @@ const DatabaseMap = {
     }] },
     sample: { holds: [] }
   },
+  lenses: WorkdayLenses,
   views: {
     plantSummary: {
       id: "plantSummary",

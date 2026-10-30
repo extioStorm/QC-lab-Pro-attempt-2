@@ -91,3 +91,30 @@ TestDefinitions.workdayLog = {
     { key: "closeNotes", label: "Notes", type: "text", section: "7 · Close Out" }
   ]
 };
+
+// The roadway technician's workday, in order. Drawn above the tree for the selected plant (renderLensBlock).
+//   section entry  a section of the day's Workday Log (progress = filled / total)
+//   records entry  the day's records of a test, with its add action; with doneKey, how many are done
+const todaysCores = { records: "core", timeKey: "systemCreatedAt" };
+const todaysCoresRun = { ...todaysCores, doneKey: "coreGmb", doneLabel: "run", warnLabel: "cores not run" };
+const WorkdayLenses = {
+  roadway: {
+    id: "roadway",
+    label: "Roadway Workday",
+    icon: "🛣️",
+    parent: "plant",
+    window: { type: "workdayLog", startKey: "startedAt", endKey: "endedAt" },
+    startLabel: "Start Today's Workday",
+    entries: [
+      { label: "Open plant", section: "1 · Open Plant" },
+      { label: "Plan with scale house and plant lab", section: "2 · Plan" },
+      { label: "PQI setup", section: "3 · PQI Setup" },
+      { label: "Load up", section: "4 · Load Up" },
+      { label: "Jobsite setup", section: "5 · Jobsite Setup" },
+      { label: "Cores", ...todaysCores },
+      { label: "Weather", section: "6 · Weather" },
+      { label: "Back at the plant: run the cores", ...todaysCoresRun },
+      { label: "Close out", section: "7 · Close Out", warn: todaysCoresRun }
+    ]
+  }
+};

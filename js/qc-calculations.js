@@ -34,6 +34,34 @@ function valueOf(type, record, ctx, key) {
   if (step && step.home && ctx[step.home]) return ctx[step.home][key];
   return record ? record[key] : null;
 }
+// Whether a step has been filled in: a ticked box, some text or a pick, a number, a date.
+function isStepFilled(type, record, ctx, step) {
+  const value = valueOf(type, record, ctx, step.key);
+  if (step.type === "check") return value === true;
+  return hasNumber(value) || (typeof value === "string" && value.trim() !== "");
+}
+// The day a lens looks at: the latest record of `window.type` in `scope` (by its start time) and its span,
+// which ends at that record's end time, or stays open while it has none.
+function currentWindow(scope, window) {
+  const collection = DatabaseMap.tests[window.type].collection;
+  const latest = Object.values(scope[collection] || {})
+    .map(record => ({ record, start: parseLocalTime(record[window.startKey]) }))
+    .filter(entry => entry.start !== null)
+    .sort((a, b) => a.start - b.start)
+    .pop();
+  if (!latest) return null;
+  const end = parseLocalTime(latest.record[window.endKey]);
+  return { record: latest.record, start: latest.start, end: end === null ? Infinity : end };
+}
+// The records of a test in `scope` whose `timeKey` falls inside a window, and those without a `doneKey` value yet.
+function recordsInWindow(scope, { records: type, timeKey, doneKey }, win) {
+  const records = Object.values(scope[DatabaseMap.tests[type].collection] || {}).filter(record => {
+    const time = parseLocalTime(record[timeKey]);
+    return time !== null && time >= win.start && time <= win.end;
+  });
+  const notDone = doneKey ? records.filter(record => !hasNumber(resolve(record[doneKey]))) : [];
+  return { records, notDone };
+}
 function computeStep(type, step, record, ctx) {
   let raw = null;
   if (step.fetch && SourceResolvers[step.fetch]) {

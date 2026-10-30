@@ -294,6 +294,100 @@ function deleteRecord(parent, collectionName, id, title, keepContext) {
   renderDrawerContent();
   renderScreen();
 }
+// A test record's name in lists (its definition's itemLabel, else "Title #id").
+function testRecordTitle(type, record, id) {
+  const definition = TestDefinitions[type], nav = definition.navigation || {};
+  return nav.itemLabel ? nav.itemLabel(record, id) : `${definition.title} #${id}`;
+}
+// Open one record of a test. `context` is the Nav ids of the levels above it.
+function openTestRecord(type, id, context) {
+  navigateTo(Object.assign({}, context, { activeTestType: type, activeTestId: id }));
+}
+// A test record as a tree row (tap opens it). `parentActive`: its parent is the selected record.
+function buildTestRecordRow(type, record, context, parentActive = false) {
+  const id = record[DatabaseMap.tests[type].idKey];
+  return createTreeRow({
+    icon: TestDefinitions[type].icon || "📄",
+    title: testRecordTitle(type, record, id),
+    isLeaf: true,
+    isActive: parentActive && Nav.activeTestType === type && Nav.activeTestId === id,
+    onSelect: () => openTestRecord(type, id, context)
+  });
+}
+// The row that adds a new record of a test to `parent` and opens it.
+function buildTestAddRow(type, parent, context, label) {
+  const test = DatabaseMap.tests[type], definition = TestDefinitions[type];
+  return createTreeRow({
+    icon: "➕",
+    title: label || (definition.navigation || {}).addLabel || `Add ${definition.title}`,
+    isLeaf: true,
+    isAddAction: true,
+    onSelect: () => {
+      const record = test.create(parent);
+      if (!record) return;
+      saveToStorage();
+      openTestRecord(type, record[test.idKey], context);
+    }
+  });
+}
+// The lens: the module's declared workday entries (DatabaseMap.lenses) for the selected `parent`, drawn above
+// the tree with the same rows and navigation. Progress is counted from the records every time it is drawn.
+function renderLensBlock(container) {
+  const lens = Object.values(DatabaseMap.lenses || {})[0];
+  const ctx = getActiveContext();
+  const scope = lens && ctx[lens.parent];
+  if (!scope) return;
+  const context = Object.assign(contextIds(ctx, lens.parent), selectionTarget(lens.parent, scope[DatabaseMap.entities[lens.parent].idKey]));
+  const win = currentWindow(scope, lens.window);
+  const windowTest = DatabaseMap.tests[lens.window.type];
+  container.appendChild(createTreeRow({
+    icon: lens.icon || "📋",
+    title: win ? `${lens.label} · ${testRecordTitle(lens.window.type, win.record, win.record[windowTest.idKey])}` : lens.label,
+    isOpen: true,
+    getChildren: rows => {
+      if (!win) { rows.appendChild(buildTestAddRow(lens.window.type, scope, context, lens.startLabel)); return; }
+      lens.entries.forEach((entry, i) => rows.appendChild(buildLensEntryRow(entry, `${i + 1}. ${entry.label}`, lens, scope, win, context, ctx)));
+    }
+  }));
+}
+// One lens entry: a section of the day's window record (filled/total), records in the window that still need
+// something (done/total; opens the first not done), or the window's records with the add action.
+function buildLensEntryRow(entry, title, lens, scope, win, context, ctx) {
+  const mark = done => (done ? "✅" : "▫️");
+  if (entry.section) {
+    const type = lens.window.type;
+    const steps = TestDefinitions[type].sequence.filter(step => step.section === entry.section && step.type !== "computed");
+    const filled = steps.filter(step => isStepFilled(type, win.record, ctx, step)).length;
+    const warning = entry.warn ? recordsInWindow(scope, entry.warn, win).notDone.length : 0;
+    return createTreeRow({
+      icon: mark(filled === steps.length),
+      title: `${title} · ${filled}/${steps.length}${warning ? ` · ⚠ ${entry.warn.warnLabel}: ${warning}` : ""}`,
+      isLeaf: true,
+      onSelect: () => {
+        openTestRecord(type, win.record[DatabaseMap.tests[type].idKey], context);
+        if (steps.length) jumpToStep(steps[0].key);
+      }
+    });
+  }
+  const { records, notDone } = recordsInWindow(scope, entry, win);
+  const idKey = DatabaseMap.tests[entry.records].idKey;
+  if (entry.doneKey) {
+    return createTreeRow({
+      icon: mark(records.length && !notDone.length),
+      title: `${title} · ${records.length - notDone.length} of ${records.length} ${entry.doneLabel}`,
+      isLeaf: true,
+      onSelect: () => { if (notDone.length) openTestRecord(entry.records, notDone[0][idKey], context); }
+    });
+  }
+  return createTreeRow({
+    icon: TestDefinitions[entry.records].icon || "📄",
+    title: `${title} · ${records.length}`,
+    getChildren: rows => {
+      records.forEach(record => rows.appendChild(buildTestRecordRow(entry.records, record, context, true)));
+      rows.appendChild(buildTestAddRow(entry.records, scope, context));
+    }
+  });
+}
 function renderRecursiveNode(levelType, obj, id, container, parentContext = {}) {
   const navKey = navKeyOf(levelType);
   const currentContext = Object.assign({}, parentContext, { [navKey]: id });
@@ -356,36 +450,11 @@ function renderRecursiveNode(levelType, obj, id, container, parentContext = {}) 
         if (h.test) {
           const testCollection = obj[collectionName] || {};
           const testDef = TestDefinitions[h.test];
-          const testMap = DatabaseMap.tests[h.test];
           const nav = testDef.navigation || {};
           const isTestGroupActive = isSelfActive && Nav.activeTestType === h.test;
           const renderTestEntries = testContainer => {
-            Object.entries(testCollection).forEach(([storedId, record]) => {
-              const testId = record[testMap.idKey] || storedId;
-              const isActive = isSelfActive && Nav.activeTestType === h.test && Nav.activeTestId === testId;
-              testContainer.appendChild(createTreeRow({
-                icon: testDef.icon || "📄",
-                title: nav.itemLabel ? nav.itemLabel(record, testId) : `${testDef.title} #${testId}`,
-                isLeaf: true,
-                isActive,
-                onSelect: () => navigateTo(Object.assign({}, currentContext, { activeTestType: h.test, activeTestId: testId }))
-              }));
-            });
-            if (typeof testMap.create === "function") {
-              testContainer.appendChild(createTreeRow({
-                icon: "➕",
-                title: nav.addLabel || `Add ${testDef.title}`,
-                isLeaf: true,
-                isAddAction: true,
-                onSelect: () => {
-                  const newRecord = testMap.create(obj);
-                  if (!newRecord) return;
-                  const testId = newRecord[testMap.idKey];
-                  saveToStorage();
-                  navigateTo(Object.assign({}, currentContext, { activeTestType: h.test, activeTestId: testId }));
-                }
-              }));
-            }
+            Object.values(testCollection).forEach(record => testContainer.appendChild(buildTestRecordRow(h.test, record, currentContext, isSelfActive)));
+            testContainer.appendChild(buildTestAddRow(h.test, obj, currentContext));
           };
           if (nav.group) {
             childEl.appendChild(createTreeRow({
@@ -417,12 +486,14 @@ function renderDrawerContent() {
     <div class="tree-search-wrap">
       <input type="text" id="tree-search-input" placeholder="🔍 Quick Filter..." oninput="filterTreeNodes(this.value)">
     </div>
+    <div id="lens-root" class="lens-root"></div>
     <div id="tree-root"></div>
     <div class="drawer-section">
       <div class="section-label">⚙️ Maintenance & Testing</div>
       <button class="btn-danger btn-small" onclick="resetDatabase()">🗑️ Reset Database (Start Fresh)</button>
     </div>
   `;
+  renderLensBlock(document.getElementById("lens-root"));
   const root = document.getElementById("tree-root");
   const rootRecords = appDb[DatabaseMap.rootCollection] || {};
   Object.keys(rootRecords).forEach(rootId => {

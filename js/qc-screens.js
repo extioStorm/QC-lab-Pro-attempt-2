@@ -127,9 +127,8 @@ function renderLanding(container) {
 
 function buildTestDeleteCard() {
   const ctx = getActiveContext();
-  const test = DatabaseMap.tests[Nav.activeTestType], testDef = TestDefinitions[Nav.activeTestType];
-  const nav = testDef.navigation || {};
-  const title = nav.itemLabel ? nav.itemLabel(ctx.record, Nav.activeTestId) : `${testDef.title} #${Nav.activeTestId}`;
+  const test = DatabaseMap.tests[Nav.activeTestType];
+  const title = testRecordTitle(Nav.activeTestType, ctx.record, Nav.activeTestId);
   const card = el("div", "card");
   card.appendChild(buildDeleteButton(`🗑 Delete ${title}`, () => deleteRecord(ctx[test.parent], test.collection, Nav.activeTestId, title, contextIds(ctx, null))));
   return card;

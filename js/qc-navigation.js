@@ -1,15 +1,21 @@
 //@ts-nocheck
 const STORAGE_DB_KEY = DatabaseMap.storage.databaseKey;
 const STORAGE_NAV_KEY = DatabaseMap.storage.navigationKey;
-const Nav = {
-  activeTestType: null,
-  activeTestId: null,
-  mode: "SPEED",
-  stepIndex: 0
-};
-Object.entries(DatabaseMap.entities).forEach(([type, definition]) => {
-  Nav[definition.navKey || `${type}Id`] = null;
-});
+const NO_ACTIVE_TEST = { activeTestType: null, activeTestId: null };
+const Nav = { mode: "SPEED" };
+// The Nav key that holds the selected id at a level.
+function navKeyOf(level) {
+  const definition = DatabaseMap.entities[level] || {};
+  return definition.navKey || `${level}Id`;
+}
+function clearActiveTest() { Object.assign(Nav, NO_ACTIVE_TEST); }
+// Nothing selected at any level, no test open.
+function clearSelection() {
+  Object.keys(DatabaseMap.entities).forEach(level => { Nav[navKeyOf(level)] = null; });
+  clearActiveTest();
+  Nav.stepIndex = 0;
+}
+clearSelection();
 let appDb = (typeof createDatabase === "function") ? createDatabase(DatabaseMap) : {};
 function saveToStorage() {
   try {
@@ -26,10 +32,7 @@ function loadFromStorage() {
     if (rawDb) appDb = JSON.parse(rawDb);
     if (rawNav) Object.assign(Nav, JSON.parse(rawNav));
     // A saved screen that no longer exists (renamed or removed) falls back to the landing page.
-    if (Nav.activeTestType && !DatabaseMap.tests[Nav.activeTestType] && !(DatabaseMap.views || {})[Nav.activeTestType]) {
-      Nav.activeTestType = null;
-      Nav.activeTestId = null;
-    }
+    if (Nav.activeTestType && !DatabaseMap.tests[Nav.activeTestType] && !(DatabaseMap.views || {})[Nav.activeTestType]) clearActiveTest();
   } catch (e) {
     console.warn("Storage load failed:", e);
   }
@@ -39,14 +42,7 @@ function resetDatabase() {
   localStorage.removeItem(STORAGE_DB_KEY);
   localStorage.removeItem(STORAGE_NAV_KEY);
   appDb = createDatabase(DatabaseMap);
-  Object.entries(DatabaseMap.entities).forEach(([type, definition]) => {
-    Nav[definition.navKey || `${type}Id`] = null;
-  });
-  Object.assign(Nav, {
-    activeTestType: null,
-    activeTestId: null,
-    stepIndex: 0
-  });
+  clearSelection();
   toggleDrawer(false);
   renderScreen();
 }
@@ -61,7 +57,7 @@ function getActiveContext() {
   while (level && collection) {
     const definition = DatabaseMap.entities[level];
     if (!definition) break;
-    const id = Nav[definition.navKey || `${level}Id`];
+    const id = Nav[navKeyOf(level)];
     if (id === null || id === undefined) break;
     const record = collection[id];
     if (!record) break;
@@ -69,7 +65,7 @@ function getActiveContext() {
     const possibleChildren = (DatabaseMap.tree[level] && DatabaseMap.tree[level].holds || []).filter(hold => hold.node);
     const next = possibleChildren.find(hold => {
       const child = DatabaseMap.entities[hold.node];
-      return child && Nav[child.navKey || `${hold.node}Id`] !== null;
+      return child && Nav[navKeyOf(hold.node)] !== null;
     });
     if (!next) break;
     collection = record[next.collection];
@@ -89,10 +85,8 @@ function getStepHome(step) {
   if (step && step.home && ctx[step.home]) return ctx[step.home];
   return ctx.record;
 }
-function findStep(key) {
-  const def = TestDefinitions[Nav.activeTestType];
-  return def ? def.sequence.find(st => st.key === key) || null : null;
-}
+// A step of the test on screen.
+function findStep(key) { return stepOf(Nav.activeTestType, key); }
 function navigateTo(target, { keepDrawer = false } = {}) {
   Object.assign(Nav, target);
   if (!keepDrawer) toggleDrawer(false);
@@ -150,7 +144,7 @@ function followDependencyRoute(route, targetType) {
 function selectionTarget(level, id) {
   const def = DatabaseMap.entities[level];
   const hold = Object.values(DatabaseMap.tree).flatMap(node => node.holds).find(h => h.node === level);
-  const target = { [def.navKey || `${level}Id`]: id };
+  const target = { [navKeyOf(level)]: id };
   ((hold && hold.navigation && hold.navigation.clearNav) || []).forEach(key => { target[key] = null; });
   return target;
 }
@@ -159,7 +153,7 @@ function contextIds(ctx, stopAtLevel) {
   const ids = {};
   for (const [level, def] of Object.entries(DatabaseMap.entities)) {
     if (level === stopAtLevel || !ctx[level]) break;
-    ids[def.navKey || `${level}Id`] = ctx[level][def.idKey];
+    ids[navKeyOf(level)] = ctx[level][def.idKey];
   }
   return ids;
 }
@@ -279,15 +273,10 @@ function createNavigationChild(action, parent, level) {
   if (values === null) return;
   const record = action.create(parent, values);
   if (!record) return;
-  const definition = DatabaseMap.entities[level] || {};
-  const idKey = action.idKey || definition.idKey;
-  const navKey = definition.navKey || `${level}Id`;
-  if (idKey && record[idKey] !== undefined) Nav[navKey] = record[idKey];
+  const idKey = action.idKey || (DatabaseMap.entities[level] || {}).idKey;
+  if (idKey && record[idKey] !== undefined) Nav[navKeyOf(level)] = record[idKey];
   (action.clearNav || []).forEach(key => { Nav[key] = null; });
-  if (action.clearActiveTest) {
-    Nav.activeTestType = null;
-    Nav.activeTestId = null;
-  }
+  if (action.clearActiveTest) clearActiveTest();
   saveToStorage();
   renderDrawerContent();
 }
@@ -299,23 +288,21 @@ function deleteRecord(parent, collectionName, id, title, keepContext) {
   Object.values(DatabaseMap.entities).forEach(def => {
     if (def.navKey && !(def.navKey in keepContext)) Nav[def.navKey] = null;
   });
-  Nav.activeTestType = null;
-  Nav.activeTestId = null;
+  clearActiveTest();
   try { propagateAll(appDb); } catch (e) { console.warn("Recalculation after delete failed:", e); }
   saveToStorage();
   renderDrawerContent();
   renderScreen();
 }
 function renderRecursiveNode(levelType, obj, id, container, parentContext = {}) {
-  const entityDefinition = DatabaseMap.entities[levelType] || {};
-  const navKey = entityDefinition.navKey || `${levelType}Id`;
+  const navKey = navKeyOf(levelType);
   const currentContext = Object.assign({}, parentContext, { [navKey]: id });
   const isSelfActive = Nav[navKey] === id;
   const nodeRow = createTreeRow({
     icon: getNodeIcon(levelType),
     title: getNodeTitle(levelType, obj, id),
     isOpen: isSelfActive,
-    onFocus: () => navigateTo(Object.assign({}, parentContext, selectionTarget(levelType, id), { activeTestType: null, activeTestId: null }), { keepDrawer: true }),
+    onFocus: () => navigateTo(Object.assign({}, parentContext, selectionTarget(levelType, id), NO_ACTIVE_TEST), { keepDrawer: true }),
     getChildren: (childEl) => {
       Object.values(DatabaseMap.views || {}).filter(view => view.parent === levelType).forEach(view => {
         const isViewActive = isSelfActive && Nav.activeTestType === view.id;
@@ -337,7 +324,7 @@ function renderRecursiveNode(levelType, obj, id, container, parentContext = {}) 
           const childDefinition = DatabaseMap.entities[h.node] || {};
           const activeTest = DatabaseMap.tests[Nav.activeTestType];
           const activeView = (DatabaseMap.views || {})[Nav.activeTestType];
-          const childNavKey = childDefinition.navKey || `${h.node}Id`;
+          const childNavKey = navKeyOf(h.node);
           const isHoldActive = Boolean(Nav[childNavKey]) || Boolean(activeTest && activeTest.parent === h.node) || Boolean(activeView && activeView.parent === h.node);
           const renderChildEntries = target => {
             Object.keys(collectionObj).forEach(childId => {
@@ -422,28 +409,24 @@ function renderDrawerContent() {
   drawer.innerHTML = `
     <div class="drawer-header">
       <div>
-        <div style="font-weight:800;font-size:1rem;color:var(--accent);">NAVIGATION TREE</div>
-        <div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">Active path auto-expanded</div>
+        <div class="logo">NAVIGATION TREE</div>
+        <div class="caption">Active path auto-expanded</div>
       </div>
-      <button class="btn-icon" onclick="toggleDrawer(false)" style="font-size:1.1rem;">✕</button>
+      <button class="btn-icon" onclick="toggleDrawer(false)">✕</button>
     </div>
     <div class="tree-search-wrap">
       <input type="text" id="tree-search-input" placeholder="🔍 Quick Filter..." oninput="filterTreeNodes(this.value)">
     </div>
-    <div id="tree-root" style="padding: 0.5rem 0.35rem; display: flex; flex-direction: column; gap: 0.2rem;"></div>
-    <div style="border-top: 1px solid var(--panel-border); margin-top: 1rem; padding: 0.75rem 0.5rem;">
-      <div style="font-size: 0.72rem; color: var(--muted); font-weight: 700; text-transform: uppercase; margin-bottom: 0.5rem; padding: 0 0.5rem;">
-        ⚙️ Maintenance & Testing
-      </div>
-      <button class="btn-secondary" style="width: 100%; height: 38px; font-size: 0.8rem; border-color: var(--danger); color: var(--danger);" onclick="resetDatabase()">
-        🗑️ Reset Database (Start Fresh)
-      </button>
+    <div id="tree-root"></div>
+    <div class="drawer-section">
+      <div class="section-label">⚙️ Maintenance & Testing</div>
+      <button class="btn-danger btn-small" onclick="resetDatabase()">🗑️ Reset Database (Start Fresh)</button>
     </div>
   `;
   const root = document.getElementById("tree-root");
-  const projectList = appDb[DatabaseMap.rootCollection] || {};
-  Object.keys(projectList).forEach(projId => {
-    renderRecursiveNode(DatabaseMap.rootEntity, projectList[projId], projId, root);
+  const rootRecords = appDb[DatabaseMap.rootCollection] || {};
+  Object.keys(rootRecords).forEach(rootId => {
+    renderRecursiveNode(DatabaseMap.rootEntity, rootRecords[rootId], rootId, root);
   });
   const rootAction = DatabaseMap.rootNavigation;
   root.appendChild(createTreeRow({

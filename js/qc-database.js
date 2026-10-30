@@ -1,5 +1,11 @@
+// The one "is there a usable number here" check. Empty, null, undefined and NaN are not numbers.
+function hasNumber(v) {
+  return v !== null && v !== undefined && v !== "" && !isNaN(v);
+}
+function isPositiveNumber(v) { return hasNumber(v) && Number(v) > 0; }
+function isZeroOrMore(v) { return hasNumber(v) && Number(v) >= 0; }
 function roundHalfToEven(value, decimals = 3) {
-  if (value === null || value === undefined || isNaN(value)) return null;
+  if (!hasNumber(value)) return null;
   const factor = Math.pow(10, decimals);
   const scaled = value * factor;
   const sign = Math.sign(scaled);
@@ -33,7 +39,7 @@ function resolve(field) {
 }
 function formatValue(field, decimals) {
   const val = resolve(field);
-  if (val === null || val === undefined || isNaN(val)) return "--";
+  if (!hasNumber(val)) return "--";
   return Number(val).toFixed(decimals);
 }
 function createDatabase(model) {

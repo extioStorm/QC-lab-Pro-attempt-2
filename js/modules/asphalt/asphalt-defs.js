@@ -313,7 +313,7 @@ const TestDefinitions = {
     title: "Dryback Correction",
     icon: "💧",
     database: { parent: "plant", collection: "drybackCorrections", idKey: "drybackId", idPrefix: "DRY-", idPad: 2, defaults: { correction: DEFAULT_DRYBACK_CORRECTION } },
-    navigation: { group: true, groupIcon: "💧", collectionLabel: "Dryback Corrections", addLabel: "Add Dryback Correction", itemLabel: (r, id) => `Correction @ ${shortStamp(r.effectiveDate)}${r.correction !== null && r.correction !== undefined ? " · " + Number(r.correction).toFixed(3) : ""}` },
+    navigation: { group: true, groupIcon: "💧", collectionLabel: "Dryback Corrections", addLabel: "Add Dryback Correction", itemLabel: (r, id) => `Correction @ ${shortStamp(r.effectiveDate)}${hasNumber(r.correction) ?" · " + Number(r.correction).toFixed(3) : ""}` },
     sequence: [
       { key: "correction", label: "Dryback Correction", type: "input", unit: "", decimals: 3, step: "0.001", instruction: "Subtracted from Gmm SSD." },
       { key: "effectiveDate", label: "In Effect From", type: "datetime", autoKey: "isUsingAutoDate", autoValueKey: "systemCreatedAt", autoHint: "automatic", manualHint: "entered", rerender: true, instruction: "Effective date." }

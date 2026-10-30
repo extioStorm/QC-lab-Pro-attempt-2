@@ -3,73 +3,58 @@
 // person override it. It only draws and reacts. The dependency graph comes from qc-calculations.js
 // (directDependencies, buildDependencyTrace, dependencyLabel) and getting around from qc-navigation.js
 // (jumpToStep, followDependencyRoute).
+// Something the person entered changed `key`: recalculate everything that depends on it and save.
+// redraw: rebuild the screen (needed when the change alters what is shown, not just numbers).
+// reopen: open the inspector on `key` again after the redraw.
+function commitChange(key, { redraw = true, reopen = false } = {}) {
+  propagateChange(Nav.activeTestType, getActiveContext(), key);
+  saveToStorage();
+  if (!redraw) { updateCalculatedDisplays(); return; }
+  renderScreen();
+  if (reopen) reopenInspector(key);
+}
+
 function handleScaleInput(fieldKey, rawValue) {
   const ctx = getActiveContext();
   if (!ctx.record) return;
   const step = findStep(fieldKey);
   const home = getStepHome(step) || ctx.record;
   home[fieldKey] = rawValue === "" ? null : parseFloat(rawValue);
-  propagateChange(Nav.activeTestType, ctx, fieldKey);
-  updateCalculatedDisplays();
-  saveToStorage();
-  if (step && step.rerender) renderScreen();
+  commitChange(fieldKey, { redraw: Boolean(step && step.rerender) });
 }
 
 function handleDatetimeInput(fieldKey, rawValue) {
-  const ctx = getActiveContext();
+  const record = getActiveRecord();
   const step = findStep(fieldKey);
-  if (!ctx.record || !step) return;
-  const record = ctx.record;
-  if (rawValue) {
-    record[fieldKey] = rawValue;
-    if (step.autoKey) record[step.autoKey] = false;
-  } else if (step.autoValueKey) {
-    record[fieldKey] = record[step.autoValueKey];
-    if (step.autoKey) record[step.autoKey] = true;
-  } else {
-    record[fieldKey] = null;
-  }
-  propagateChange(Nav.activeTestType, ctx, fieldKey);
-  saveToStorage();
-  renderScreen();
+  if (!record || !step) return;
+  const useAuto = !rawValue && step.autoValueKey;
+  record[fieldKey] = rawValue || (useAuto ? record[step.autoValueKey] : null);
+  if (step.autoKey) record[step.autoKey] = Boolean(useAuto);
+  commitChange(fieldKey);
 }
 
-function handleChoiceInput(fieldKey, value) {
+// A choice (which Rice test, which calibration...) changed. `stepProp` says which resolver the step uses:
+// "resolver" for a choice step, "fetch" for a fetched value whose source is swapped in the inspector.
+function applySourceChoice(fieldKey, value, stepProp, reopen) {
   const step = findStep(fieldKey);
-  if (!step || !SourceResolvers[step.resolver]) return;
-  const ctx = getActiveContext();
-  SourceResolvers[step.resolver].apply(ctx, value);
-  propagateChange(Nav.activeTestType, ctx, fieldKey);
-  saveToStorage();
-  renderScreen();
+  const resolver = step && SourceResolvers[step[stepProp]];
+  if (!resolver) return;
+  resolver.apply(getActiveContext(), value);
+  commitChange(fieldKey, { reopen });
 }
-
-// Swapping a source/calibration is a Door 1 input: updates link and propagates downstream
-function handleSourceSwap(fieldKey, value) {
-  const step = findStep(fieldKey);
-  if (!step || !step.fetch || !SourceResolvers[step.fetch]) return;
-  const ctx = getActiveContext();
-  SourceResolvers[step.fetch].apply(ctx, value);
-  propagateChange(Nav.activeTestType, ctx, fieldKey);
-  updateCalculatedDisplays();
-  saveToStorage();
-  renderScreen();
-  reopenInspector(fieldKey);
-}
+function handleChoiceInput(fieldKey, value) { applySourceChoice(fieldKey, value, "resolver", false); }
+function handleSourceSwap(fieldKey, value) { applySourceChoice(fieldKey, value, "fetch", true); }
 
 function updateCalculatedDisplays() {
   const record = getActiveRecord();
   if (!record) return;
-  const test = TestDefinitions[Nav.activeTestType];
-  const sequence = test ? test.sequence : [];
   document.querySelectorAll("[data-calc]").forEach(el => {
     const fieldKey = el.getAttribute("data-calc");
     const fieldObj = record[fieldKey];
     if (!fieldObj) return;
-    const step = sequence.find(item => item.key === fieldKey);
-    const decimals = step && step.decimals !== undefined ? step.decimals : 3;
-    el.textContent = formatValue(fieldObj, decimals);
-    el.style.color = fieldObj.isManual ? "var(--warning)" : "var(--success)";
+    const step = findStep(fieldKey);
+    el.textContent = formatValue(fieldObj, step && step.decimals !== undefined ? step.decimals : 3);
+    el.classList.toggle("is-manual", Boolean(fieldObj.isManual));
   });
 }
 
@@ -91,72 +76,44 @@ function goToDependency(route, type, key) {
   if (found && step && step.type === "computed") reopenInspector(key);
 }
 
+// A tappable dependency: shows its name, explains the relation on hover, and goes there when tapped.
+function buildDependencyButton(dep, route, className) {
+  const button = el("button", className, dependencyLabel(dep.type, dep.key));
+  button.type = "button";
+  button.title = dep.relations.join("; ");
+  button.onclick = () => goToDependency(route, dep.type, dep.key);
+  return button;
+}
+
+// The whole chain behind a value, one group per calculation: its inputs (tappable) → what they make.
 function renderInspectorFullTrace(drawer, outputKey, type) {
-  const details = document.createElement("details");
-  details.className = "inspector-full-trace";
-  const summary = document.createElement("summary");
-  summary.textContent = "Full dependency trace";
-  details.appendChild(summary);
+  const details = el("details", "inspector-full-trace");
+  details.appendChild(el("summary", "", "Full dependency trace"));
+  drawer.appendChild(details);
 
   const trace = buildDependencyTrace(type, outputKey);
   if (!trace.root || !trace.root.dependencies.length) {
-    const empty = document.createElement("div");
-    empty.className = "dependency-detail";
-    empty.textContent = "No declared dependency chain.";
-    details.appendChild(empty);
-    drawer.appendChild(details);
+    details.appendChild(el("div", "dependency-detail", "No declared dependency chain."));
     return;
   }
-
-  const body = document.createElement("div");
-  body.className = "trace-body";
+  const body = el("div", "trace-body");
   trace.nodes.filter(node => node.dependencies.length)
     .sort((a, b) => a.depth - b.depth || a.id.localeCompare(b.id))
     .forEach(node => {
-      const group = document.createElement("div");
-      group.className = "trace-group";
-      const level = document.createElement("div");
-      level.className = "trace-level";
-      level.textContent = "Calculation level " + node.depth;
-      group.appendChild(level);
-
-      const inputs = document.createElement("div");
-      inputs.className = "trace-inputs";
+      const group = el("div", "trace-group");
+      group.appendChild(el("div", "trace-level", "Calculation level " + node.depth));
+      const inputs = el("div", "trace-inputs");
       node.dependencies.forEach((dep, index) => {
-        if (index) {
-          const separator = document.createElement("span");
-          separator.className = "trace-sep";
-          separator.textContent = "+";
-          inputs.appendChild(separator);
-        }
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "btn-secondary trace-chip";
-        button.textContent = dependencyLabel(dep.type, dep.key);
-        button.title = dep.relations.join("; ");
-        button.onclick = () => goToDependency(dep.node.route, dep.type, dep.key);
-        inputs.appendChild(button);
+        if (index) inputs.appendChild(el("span", "trace-sep", "+"));
+        inputs.appendChild(buildDependencyButton(dep, dep.node.route, "btn-secondary btn-small"));
       });
       group.appendChild(inputs);
-
-      const arrow = document.createElement("div");
-      arrow.className = "trace-arrow";
-      arrow.textContent = "↓";
-      group.appendChild(arrow);
-
-      const output = document.createElement("div");
-      output.className = "trace-output";
-      output.textContent = dependencyLabel(node.type, node.key);
-      group.appendChild(output);
+      group.appendChild(el("div", "trace-arrow", "↓"));
+      group.appendChild(el("div", "trace-output", dependencyLabel(node.type, node.key)));
       body.appendChild(group);
     });
-
-  const final = document.createElement("div");
-  final.className = "trace-final";
-  final.textContent = "Inspected value: " + dependencyLabel(type, outputKey);
-  body.appendChild(final);
+  body.appendChild(el("div", "trace-final", "Inspected value: " + dependencyLabel(type, outputKey)));
   details.appendChild(body);
-  drawer.appendChild(details);
 }
 
 function toggleInspector(outputKey, cardEl) {
@@ -172,102 +129,60 @@ function toggleInspector(outputKey, cardEl) {
   const type = Nav.activeTestType;
   const step = stepOf(type, outputKey);
   const isManual = fieldObj.isManual;
-  const currentVal = fieldObj.manual !== null ? fieldObj.manual : "";
 
-  const drawer = document.createElement("div");
-  drawer.className = "dependency-box";
-  drawer.innerHTML =
-    '<div class="dependency-title">🔍 Inspect: ' + escapeHtml(outputKey) + '</div>' +
-    '<div class="dependency-detail">Status: <strong>' +
-      (isManual ? "🟡 Manual Override Active" : "🟢 Auto Calculated") + '</strong></div>' +
-    '<div class="dependency-detail"><strong>Direct dependencies</strong></div>' +
-    '<div class="dependency-direct-list"></div>' +
-    '<div class="dependency-source"></div>' +
-    '<div class="dependency-section">' +
-      '<label class="override-label">Manual Override Value:</label>' +
-      '<input type="number" class="override-input" step="any" placeholder="Type override number...">' +
-      '<button class="btn-action override-btn' + (isManual ? ' is-manual' : '') + '">' +
-        (isManual ? "Switch Back to Auto Value" : "Turn ON Manual Override") +
-      '</button></div>';
+  const drawer = el("div", "dependency-box");
+  drawer.appendChild(el("div", "dependency-title", "🔍 Inspect: " + outputKey));
+  const status = el("div", "dependency-detail", "Status: ");
+  status.appendChild(el("strong", "", isManual ? "🟡 Manual Override Active" : "🟢 Auto Calculated"));
+  drawer.appendChild(status);
 
-  const overrideInput = drawer.querySelector('input[type="number"]');
-  overrideInput.value = currentVal;
-  overrideInput.onchange = () => setManualOverride(outputKey, overrideInput.value);
-  drawer.querySelector(".btn-action").onclick = () => toggleOverrideSwitch(outputKey);
+  drawer.appendChild(el("div", "dependency-detail strong", "Direct dependencies"));
+  const dependencyList = el("div", "dependency-direct-list");
+  directDependencies(type, outputKey).forEach(dep => {
+    const route = [{ fromType: type, fromKey: outputKey, toType: dep.type, toKey: dep.key }];
+    dependencyList.appendChild(buildDependencyButton(dep, route, "btn-secondary"));
+  });
+  if (!dependencyList.children.length) dependencyList.textContent = "No declared dependencies.";
+  drawer.appendChild(dependencyList);
 
   if (step && step.fetch && SourceResolvers[step.fetch]) {
-    const view = SourceResolvers[step.fetch].view(getActiveContext());
-    const source = drawer.querySelector(".dependency-source");
-    if ((view.options && view.options.length) || (view.lines && view.lines.length)) {
+    const source = buildSourceView(SourceResolvers[step.fetch].view(getActiveContext()), value => handleSourceSwap(outputKey, value), "🔗 Source:");
+    if (source.children.length) {
       source.classList.add("dependency-section");
-      if (view.options && view.options.length) {
-        const label = document.createElement("label");
-        label.className = "dependency-source-label";
-        label.textContent = "🔗 Attached Calibration / Source:";
-        source.appendChild(label);
-        const select = document.createElement("select");
-        select.className = "step-select";
-        view.options.forEach(option => {
-          const item = document.createElement("option");
-          item.value = option.value;
-          item.textContent = option.label;
-          item.selected = option.selected;
-          select.appendChild(item);
-        });
-        select.onchange = () => handleSourceSwap(outputKey, select.value);
-        source.appendChild(select);
-      }
-      (view.lines || []).forEach(line => {
-        const div = document.createElement("div");
-        div.className = "src-line" + (line.tone ? " src-" + line.tone : "");
-        div.textContent = line.text;
-        source.appendChild(div);
-      });
+      drawer.appendChild(source);
     }
   }
 
-  const dependencyList = drawer.querySelector(".dependency-direct-list");
-  directDependencies(type, outputKey).forEach(dep => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "btn-secondary dependency-direct-btn";
-    button.textContent = dependencyLabel(dep.type, dep.key);
-    button.title = dep.relations.join("; ");
-    button.onclick = () => goToDependency([
-      { fromType: type, fromKey: outputKey, toType: dep.type, toKey: dep.key }
-    ], dep.type, dep.key);
-    dependencyList.appendChild(button);
-  });
-  if (!dependencyList.children.length) dependencyList.textContent = "No declared dependencies.";
+  const override = el("div", "dependency-section");
+  override.appendChild(el("label", "", "Manual Override Value:"));
+  const overrideInput = el("input", "override-input");
+  overrideInput.type = "number";
+  overrideInput.step = "any";
+  overrideInput.placeholder = "Type override number...";
+  overrideInput.value = fieldObj.manual !== null ? fieldObj.manual : "";
+  overrideInput.onchange = () => setManualOverride(outputKey, overrideInput.value);
+  override.appendChild(overrideInput);
+  const toggle = el("button", "btn-primary btn-block" + (isManual ? " is-manual" : ""), isManual ? "Switch Back to Auto Value" : "Turn ON Manual Override");
+  toggle.onclick = () => toggleOverrideSwitch(outputKey);
+  override.appendChild(toggle);
+  drawer.appendChild(override);
 
   renderInspectorFullTrace(drawer, outputKey, type);
   cardEl.appendChild(drawer);
 }
 
 function setManualOverride(outputKey, rawValue) {
-  const record = getActiveRecord();
-  const fieldObj = record[outputKey];
+  const fieldObj = (getActiveRecord() || {})[outputKey];
   if (!fieldObj) return;
-  const typed = rawValue === "" ? null : parseFloat(rawValue);
-  fieldObj.manual = (typed === null || isNaN(typed)) ? null : typed;
+  const typed = parseFloat(rawValue);
+  fieldObj.manual = hasNumber(typed) ? typed : null;
   fieldObj.isManual = fieldObj.manual !== null;
-  propagateChange(Nav.activeTestType, getActiveContext(), outputKey);
-  updateCalculatedDisplays();
-  saveToStorage();
-  renderScreen();
-  reopenInspector(outputKey);
+  commitChange(outputKey, { reopen: true });
 }
 
 function toggleOverrideSwitch(outputKey) {
-  const record = getActiveRecord();
-  const fieldObj = record[outputKey];
+  const fieldObj = (getActiveRecord() || {})[outputKey];
   if (!fieldObj) return;
-  if (fieldObj.manual !== null) {
-    fieldObj.isManual = !fieldObj.isManual;
-  }
-  propagateChange(Nav.activeTestType, getActiveContext(), outputKey);
-  updateCalculatedDisplays();
-  saveToStorage();
-  renderScreen();
-  reopenInspector(outputKey);
+  if (fieldObj.manual !== null) fieldObj.isManual = !fieldObj.isManual;
+  commitChange(outputKey, { reopen: true });
 }

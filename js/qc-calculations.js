@@ -23,6 +23,10 @@ function stepOf(type, key) {
   const def = TestDefinitions[type];
   return def ? def.sequence.find(s => s.key === key) || null : null;
 }
+// Steps that are shown as "prerequisites": values that live elsewhere or are chosen/fetched from another record.
+function isPrereqStep(step) {
+  return Boolean(step && (step.home || step.fetch || step.resolver));
+}
 function valueOf(type, record, ctx, key) {
   const step = stepOf(type, key);
   if (step && step.type === "computed") return resolve(record[key]);
@@ -35,10 +39,9 @@ function computeStep(type, step, record, ctx) {
     raw = SourceResolvers[step.fetch].value(ctx);
   } else if (step.from && typeof step.calc === "function") {
     const vals = step.from.map(k => valueOf(type, record, ctx, k));
-    const ready = vals.every(v => v !== null && v !== undefined && !isNaN(v));
-    raw = ready ? step.calc(...vals) : null;
+    raw = vals.every(hasNumber) ? step.calc(...vals) : null;
   }
-  const next = (raw === null || raw === undefined || isNaN(raw)) ? null : roundHalfToEven(raw, step.decimals);
+  const next = roundHalfToEven(raw, step.decimals);
   const prev = record[step.key] ? record[step.key].auto : null;
   if (record[step.key]) {
     record[step.key].auto = next;

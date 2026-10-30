@@ -241,11 +241,25 @@ function buildDependencyLinks(step, inline = true) {
   return box.children.length ? box : null;
 }
 
+// A collapsible box (the prerequisites box, or a section of steps) holding rows in `body`.
+// It stays open across screen redraws: `openKey` names it in openFoldBoxes.
+const openFoldBoxes = new Set();
+function buildFoldBox(title, preview, openKey) {
+  const details = el("details", "prereq-card");
+  details.open = openFoldBoxes.has(openKey);
+  details.ontoggle = () => { if (details.open) openFoldBoxes.add(openKey); else openFoldBoxes.delete(openKey); };
+  const summary = el("summary", "prereq-summary");
+  const header = el("div", "prereq-header");
+  header.append(el("span", "", title), el("span", "prereq-arrow", "▶"));
+  summary.appendChild(header);
+  if (preview) summary.appendChild(el("div", "prereq-preview", preview));
+  const body = el("div", "prereq-body");
+  details.append(summary, body);
+  return { details, body };
+}
+
 // Renders the generic collapsed prerequisite header
 function renderPrereqSection(prereqSteps, record) {
-  const details = document.createElement("details");
-  details.className = "prereq-card";
-
   // Build condensed summary line of current values
   const previews = prereqSteps.map(s => {
     const home = getStepHome(s) || record;
@@ -258,29 +272,20 @@ function renderPrereqSection(prereqSteps, record) {
     return `${s.label.split(" ")[0]}: ${v}${s.unit ? " " + s.unit : ""}`;
   });
 
-  details.innerHTML = `
-    <summary class="prereq-summary">
-      <div class="prereq-header">
-        <span>⚙️ Prerequisites & References (${prereqSteps.length})</span>
-        <span class="prereq-arrow">▶</span>
-      </div>
-      <div class="prereq-preview">${previews.join(" · ")}</div>
-    </summary>
-    <div class="prereq-body"></div>
-  `;
-
-  const body = details.querySelector(".prereq-body");
-  prereqSteps.forEach(step => body.appendChild(buildStepRow(step, record, "inset")));
-
-  return details;
+  const box = buildFoldBox(`⚙️ Prerequisites & References (${prereqSteps.length})`, previews.join(" · "), `${Nav.activeTestType}:prereq`);
+  prereqSteps.forEach(step => box.body.appendChild(buildStepRow(step, record, "inset")));
+  return box.details;
 }
 
-// One step as a Speed Sheet row: a date/choice gets its control under the label, a calculated value is
-// tappable to inspect, an input gets its box on the right.
+// Steps whose control goes under the label (it needs the width), with the caption word for each.
+const BELOW_LABEL_STEPS = { datetime: "Date & time", choice: "Choose", text: "Text", select: "Pick one" };
+
+// One step as a Speed Sheet row: a date/choice/text/pick gets its control under the label, a calculated
+// value is tappable to inspect, a number or a check box goes on the right.
 function buildStepRow(step, record, className = "") {
   const base = { label: step.label, stepKey: step.key, className };
-  if (step.type === "datetime" || step.type === "choice") {
-    return buildRow({ ...base, caption: `${step.key} • ${step.type === "choice" ? "Choose" : "Date & time"}`, below: buildStepControl(step, record) });
+  if (BELOW_LABEL_STEPS[step.type]) {
+    return buildRow({ ...base, caption: `${step.key} • ${BELOW_LABEL_STEPS[step.type]}`, below: buildStepControl(step, record) });
   }
   if (step.type === "computed") {
     const row = buildRow({
@@ -295,7 +300,8 @@ function buildStepRow(step, record, className = "") {
     if (missing) row.appendChild(missing);
     return row;
   }
-  return buildRow({ ...base, caption: `${step.key} • Input (${step.unit})`, control: buildStepControl(step, record) });
+  const caption = step.type === "check" ? `${step.key} • Check` : `${step.key} • Input (${step.unit})`;
+  return buildRow({ ...base, caption, control: buildStepControl(step, record) });
 }
 
 function renderSpeedMode(container) {
@@ -306,7 +312,17 @@ function renderSpeedMode(container) {
   const card = buildCard(`⚡ Speed Sheet — ${testDef.title.toUpperCase()} #${Nav.activeTestId}`);
   const prereqSteps = testDef.sequence.filter(isPrereqStep);
   if (prereqSteps.length > 0) card.appendChild(renderPrereqSection(prereqSteps, record));
-  testDef.sequence.filter(step => !isPrereqStep(step)).forEach(step => card.appendChild(buildStepRow(step, record)));
+  // Steps with a `section` go into one collapsible box per section, in the order the sections first appear.
+  const sections = new Map();
+  testDef.sequence.filter(step => !isPrereqStep(step)).forEach(step => {
+    if (!step.section) { card.appendChild(buildStepRow(step, record)); return; }
+    if (!sections.has(step.section)) {
+      const box = buildFoldBox(step.section, "", `${Nav.activeTestType}:${step.section}`);
+      card.appendChild(box.details);
+      sections.set(step.section, box.body);
+    }
+    sections.get(step.section).appendChild(buildStepRow(step, record, "inset"));
+  });
 
   container.appendChild(card);
 }
@@ -323,14 +339,15 @@ function renderWizardMode(container) {
   const step = steps[stepIndex];
   
   const card = buildCard(`Step ${stepIndex + 1} of ${steps.length}: ${step.label}`, step.instruction || "Record the required measurement below.");
+  if (step.section) card.prepend(el("div", "section-label", step.section));
   if (step.type === "input") {
     const group = el("div", "field-group");
     group.appendChild(el("label", "", `${step.label} (${step.unit})`));
     group.appendChild(buildStepControl(step, record));
     card.appendChild(group);
-  } else if (step.type === "datetime" || step.type === "choice") {
+  } else if (step.type !== "computed") {
     card.appendChild(buildStepControl(step, record));
-  } else if (step.type === "computed") {
+  } else {
     const valBox = el("div", "value-display");
     const val = el("span", "val" + (record[step.key] && record[step.key].isManual ? " is-manual" : ""), formatValue(record[step.key], step.decimals));
     val.setAttribute("data-calc", step.key);
@@ -359,8 +376,8 @@ function renderWizardMode(container) {
 
 function buildStepControl(step, record) {
   const wrap = el("div", "step-control");
+  const home = getStepHome(step) || record;
   if (step.type === "input") {
-    const home = getStepHome(step) || record;
     const input = el("input");
     input.type = "number";
     input.inputMode = "decimal";
@@ -378,6 +395,23 @@ function buildStepControl(step, record) {
     wrap.appendChild(el("div", "src-hint", hint ? "Source: " + hint : ""));
   } else if (step.type === "choice" && SourceResolvers[step.resolver]) {
     wrap.appendChild(buildSourceView(SourceResolvers[step.resolver].view(getActiveContext()), value => handleChoiceInput(step.key, value)));
+  } else if (step.type === "text") {
+    const input = el("input");
+    input.type = "text";
+    input.value = home[step.key] ?? "";
+    input.onchange = () => handleScaleInput(step.key, input.value);
+    wrap.appendChild(input);
+  } else if (step.type === "check") {
+    const input = el("input");
+    input.type = "checkbox";
+    input.checked = Boolean(home[step.key]);
+    input.onchange = () => handleScaleInput(step.key, input.checked);
+    wrap.appendChild(input);
+  } else if (step.type === "select") {
+    const current = home[step.key] ?? "";
+    const options = [{ value: "", label: "— Choose —" }].concat((step.options || []).map(option => ({ value: option, label: option })))
+      .map(option => ({ ...option, selected: option.value === current }));
+    wrap.appendChild(buildSourceView({ options }, value => handleScaleInput(step.key, value)));
   }
   return wrap;
 }

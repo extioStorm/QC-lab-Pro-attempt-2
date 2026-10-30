@@ -24,8 +24,9 @@ function stepOf(type, key) {
   return def ? def.sequence.find(s => s.key === key) || null : null;
 }
 // Steps that are shown as "prerequisites": values that live elsewhere or are chosen/fetched from another record.
+// A step the definition places in a section is entered in this test, so it is shown in its section instead.
 function isPrereqStep(step) {
-  return Boolean(step && (step.home || step.fetch || step.resolver));
+  return Boolean(step && !step.section && (step.home || step.fetch || step.resolver));
 }
 function valueOf(type, record, ctx, key) {
   const step = stepOf(type, key);

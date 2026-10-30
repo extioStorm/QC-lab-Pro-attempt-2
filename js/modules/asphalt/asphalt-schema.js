@@ -25,7 +25,7 @@ const DatabaseMap = {
         clearNav: ["plantId", "sampleId", "activeTestType", "activeTestId"],
         create: (project, values) => {
           const id = `MIX-${nextNumber(project.mixes)}`;
-          return createDatabaseRecord(project, "mixes", id, { mixId: id, mixName: values.name, designGmm: null, plants: {} });
+          return createDatabaseRecord(project, "mixes", id, { mixId: id, mixName: values.name, designGmm: null, ratePerInch: DEFAULT_RATE_PER_INCH, plants: {} });
         }
       }
     }] },
@@ -117,6 +117,7 @@ const DatabaseMap = {
     create: (db, values) => createDatabaseRecord(db, DatabaseMap.rootCollection, values.jobId, {
       projectId: values.jobId,
       projectName: values.projectName || values.jobId,
+      sublotLengthFt: DEFAULT_SUBLOT_LENGTH_FT,
       mixes: {}
     })
   }

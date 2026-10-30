@@ -14,12 +14,17 @@ function commitChange(key, { redraw = true, reopen = false } = {}) {
   if (reopen) reopenInspector(key);
 }
 
+// A value typed, ticked or picked on a step: a number for "input", true/false for "check", text otherwise.
 function handleScaleInput(fieldKey, rawValue) {
   const ctx = getActiveContext();
   if (!ctx.record) return;
   const step = findStep(fieldKey);
   const home = getStepHome(step) || ctx.record;
-  home[fieldKey] = rawValue === "" ? null : parseFloat(rawValue);
+  const type = step ? step.type : "input";
+  const text = String(rawValue).trim();
+  if (type === "check") home[fieldKey] = Boolean(rawValue);
+  else if (text === "") home[fieldKey] = null;
+  else home[fieldKey] = type === "input" ? parseFloat(text) : text;
   commitChange(fieldKey, { redraw: Boolean(step && step.rerender) });
 }
 

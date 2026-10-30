@@ -226,6 +226,12 @@ input:focus {
   text-align: right;
   width: 100%;
 }
+input[type="checkbox"] {
+  width: 28px;
+  height: 28px;
+  accent-color: var(--accent);
+}
+.speed-input-wrap input[type="checkbox"] { display: block; width: 28px; height: 28px; margin-left: auto; }
 .speed-calc-val {
   font-size: 1.2rem;
   font-weight: 800;

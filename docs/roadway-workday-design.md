@@ -6,7 +6,8 @@ Design only; no code changed. Sources: technician-workday.md, the other project 
 - **No new tree level.** Everything stays under the plant, next to samples and cores. Records carry timestamps (as they already do) and "the day" is a lens that groups them by time window.
 - **Navigation is a lens too.** The existing tree stays as the "browse everything" view. A technician lens is a second navigation block, declared by the module and built from the same data and the same actions, shown above the tree. It follows the workday in chronological order. A lab technician lens can replace it later with no framework change (see Technician lens).
 - **Haul time = haul distance.** It stays on the plant (existing `transitMinutes`, `home: "plant"`, read by the `coreRice` policy). It is captured in the Jobsite Setup section of the day log, using the same `home` step pattern the core already uses. No policy change.
-  - Caveat: editing it recomputes target Rice for every core on that plant (that is how `propagateHome` works). Fine while the haul stays roughly constant on a job.
+  - Caveat: editing it recomputes target Rice for every core on that plant (that is how `propagateHome` works). **Decided:** haul time is set once per job and left alone; it only needs to be roughly right (it picks the closest Rice test, so 10-15 min off usually picks the same one). No lock, no warning, no saved copy. A core that must never move can have its Rice picked by hand.
+- **Prerequisites box rule.** A value is folded into the Prerequisites & References box only when it belongs to another test. On a core, haul time is a reference; in the Workday Log it is entered directly, so it shows in Jobsite Setup. In code: a step with a `section` is shown in its section (`isPrereqStep`).
 - **Lay time stays as built:** automatic (moment logged) unless the tech enters the real lay time, which then wins; clearing it returns to automatic. The design only makes this more visible (see Roadway Core).
 - **Lots and sublots: record only for now.** The tech (following the inspector) enters lot and sublot on each core. Counting rules and reminders come later (see Lots, sublots and stationing).
 - **Stations are text as written, and direction is recorded.** Stations can run up or down and can start anywhere (10+00, 15+00). The app never assumes begin < end.
@@ -44,20 +45,21 @@ A lens is a module-declared, ordered list of entries. Each entry points at somet
 Roadway technician lens, in workday order (each entry shows progress derived from the data, such as "6/9 checked" or "3 cores", never stored separately):
 1. **Open plant:** Workday Log, section 1
 2. **Plan with scale house and plant lab:** section 2
-3. **Load up:** section 3
-4. **Jobsite setup (haul time, stations, rolling pattern):** section 4
-5. **PQI setup:** section 5
+3. **PQI setup:** section 3 (before loading, so mix info such as the starting Rice can be entered first)
+4. **Load up (including the charged PQI):** section 4
+5. **Jobsite setup (haul time, stations, rolling pattern):** section 5
 6. **Mat temperatures:** Mat Temps (count, add)
-7. **Break the mat:** Break-the-Mat (count, add)
+7. **Break the mat (only when needed):** Break-the-Mat (count, add). Done the first day on a job or when something changes; not counted as unfinished on other days.
 8. **Cores:** Roadway Cores (count, add), field section
 9. **Events and weather:** Day Events (count, add), section 6
-10. **Back at the plant (core prep, lab density):** the cores' lab section
-11. **Close out and paperwork:** section 7, Red Book, Roadway Diary, Open Follow-ups
+10. **Back at the plant (run the cores):** shows how many of the day's cores have a Gmb (for example "3 of 5 cores run"); tapping opens the first core not yet run. Cores must be run before leaving if the plant lab hasn't.
+11. **Close out:** section 7, with a reminder (not a block) if any of the day's cores are not run. Red Book, Roadway Diary and Open Follow-ups are reachable from the lens at any time, since paperwork happens through the day.
 
 Notes:
 - Which Workday Log the entries open: the latest log by start time, or a "Start workday" action that creates one.
 - The active lens is saved with the rest of the navigation state, so swapping to a lab technician lens (open lab, samples, Rice, pills, calibrations) is another declaration, not new framework code.
-- The order above is a draft to confirm against how the tech really moves through the day.
+- Order confirmed with the technician (2026-10-30). It is a guide: any entry can be opened at any time.
+- The lens covers the roadway work only and ends at the cores' Gmb and density. A plant lab lens can come later.
 
 ## Modules
 
@@ -66,9 +68,9 @@ One record, grouped into collapsible sections. Step Wizard mode walks the sectio
 - **Header:** tech name (text), started at (datetime, auto; window start), ended at (datetime; window end).
 - **1 Open plant** (checks): garage/parking opened; doors, radiation storage, closets unlocked; main office open; ovens on; burners low; sink water warming; office AC set; PQI on charger. Inputs: gauge standard CHI, standard count.
 - **2 Plan:** planned mix (text); plant status (select: running / standby / not running) + reason (text); expected start (datetime); plan changes (text); plant lab tech (text); verified with plant lab (check); how we'll communicate (text).
-- **3 Load up** (checks): trailer hitch, pin, chains, lights; generator fuel, started and ran; water barrel filled; ice for expected cores; crayon, paint, core-removal tool; shovel, asphalt container, tamp, boards; tape and measuring wheel; PQI charged; red book primed + pen; truck fuel above half.
-- **4 Jobsite setup:** address/GPS (text); road (text); **haul time** (`transitMinutes`, home plant); begin station (text); **stations run** (select: increasing / decreasing); lane (select inner/outer); direction (text); mat width (ft); paving rate (lb/yd2); **rate per inch** (home mix, default 110); expected thickness (computed: rate / rate per inch); rolling pattern (text); roller operator pattern established (check); inspector name/phone (text); **sublot length** (home project, default 3000 ft; stored now, used by stage 2).
-- **5 PQI setup:** PQI ID (text); paver/screed (text); start offset (default 88); adjusted offset; reason (text); calibrated (check).
+- **3 PQI setup:** PQI ID (text); paver/screed (text); start offset (default 88); adjusted offset; reason (text); calibrated (check). Later: a "Rice to put in the gauge" reference (newest Rice test on the plant, else the mix design Gmm), shown not typed; needs the Rice-matching policy to look for the newest Rice across samples.
+- **4 Load up** (checks): trailer hitch, pin, chains, lights; generator fuel, started and ran; water barrel filled; ice for expected cores; crayon, paint, core-removal tool; shovel, asphalt container, tamp, boards; tape and measuring wheel; charged PQI in the truck; red book primed + pen; truck fuel above half.
+- **5 Jobsite setup:** address/GPS (text); road (text); **haul time** (`transitMinutes`, home plant); begin station (text); **stations run** (select: increasing / decreasing); lane (select inner/outer); direction (text); mat width (ft); paving rate (lb/yd2); **rate per inch** (home mix, default 110); expected thickness (computed: rate / rate per inch); rolling pattern (text); roller operator pattern established (check); inspector name/phone (text); **sublot length** (home project, default 3000 ft; stored now, used by stage 2).
 - **6 Weather (midday):** air temp F, wind mph, conditions (text), recorded at (datetime).
 - **7 Close out:** end station (text); lab results recorded (check); handed off to other lab tech (check); shut down and locked (checks); notes.
 
@@ -119,13 +121,13 @@ The Red Book and Diary need a day picker: choose a Workday Log, and the lens fil
 - **Reuse:** `createTestRecord`, `hasNumber`, `commitChange`, `buildRow`, `buildSourceView` are reused; existing handlers are extended rather than duplicated.
 
 ## Open questions
-1. **Lens order:** confirm the draft workday order above against how the tech really moves through the day.
+1. ~~Lens order~~: confirmed (see Technician lens).
 2. **Station helper** (convert 10+00 to 1000 ft, do the math, convert back): deferred, a later teaching calculator.
 3. **Stage 2 sublot rules:** to settle after seeing how a couple of inspectors work.
 4. **Test sections:** deferred; core kind is the hook for adding them.
 
 ## Suggested build order
-1. Framework items 1-2, then Workday Log, which gives the checklist and haul capture.
+1. Framework items 1-2, then Workday Log, which gives the checklist and haul capture. **Done:** step types `check`, `text`, `select`; `step.section` (collapsible, stays open across redraws; wizard shows the section name); Workday Log in `js/modules/asphalt/asphalt-roadway.js`; `ratePerInch` on new mixes and `sublotLengthFt` on new projects.
 2. Framework item 5 (lens block) with the roadway lens, so the checklist can be walked in order.
 3. Mat Temp, Day Event, core field steps (including core kind, lot and sublot).
 4. Framework item 3 plus the Red Book and Diary lenses.

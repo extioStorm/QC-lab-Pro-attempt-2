@@ -478,3 +478,36 @@ input[type="datetime-local"] {
   color: var(--warning);
   margin-bottom: 0.4rem;
 }
+
+/* Inspector drawer */
+.dependency-section,
+.inspector-full-trace {
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--panel-border);
+}
+.dependency-direct-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-top: 0.35rem;
+}
+.dependency-source-label { font-size: 0.8rem; font-weight: 700; color: var(--text); }
+.dependency-source .step-select { margin-top: 0.3rem; }
+.dependency-source .src-line { font-size: 0.78rem; }
+.override-label { font-size: 0.8rem; }
+.dependency-box .override-input { height: 38px; font-size: 0.95rem; margin: 0.3rem 0; }
+.override-btn { background: var(--accent); color: black; }
+.override-btn.is-manual { background: var(--warning); }
+
+/* Inspector: layered full trace */
+.inspector-full-trace summary { cursor: pointer; font-weight: 700; font-size: 0.85rem; }
+.trace-body { margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.65rem; }
+.trace-group { padding: 0.55rem; border: 1px solid var(--panel-border); border-radius: 0.45rem; }
+.trace-level { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.35rem; }
+.trace-inputs { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+.trace-sep { color: var(--muted); }
+.trace-chip { font-size: 0.78rem; padding: 0.3rem 0.45rem; }
+.trace-arrow { text-align: center; color: var(--muted); margin: 0.15rem 0; }
+.trace-output { font-weight: 700; font-size: 0.82rem; }
+.trace-final { font-weight: 700; text-align: center; padding: 0.45rem; }

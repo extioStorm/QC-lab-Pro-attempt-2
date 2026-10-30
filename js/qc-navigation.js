@@ -25,6 +25,11 @@ function loadFromStorage() {
     const rawNav = localStorage.getItem(STORAGE_NAV_KEY);
     if (rawDb) appDb = JSON.parse(rawDb);
     if (rawNav) Object.assign(Nav, JSON.parse(rawNav));
+    // A saved screen that no longer exists (renamed or removed) falls back to the landing page.
+    if (Nav.activeTestType && !DatabaseMap.tests[Nav.activeTestType] && !(DatabaseMap.views || {})[Nav.activeTestType]) {
+      Nav.activeTestType = null;
+      Nav.activeTestId = null;
+    }
   } catch (e) {
     console.warn("Storage load failed:", e);
   }
@@ -95,16 +100,50 @@ function navigateTo(target, { keepDrawer = false } = {}) {
   renderScreen();
 }
 
-// Jump to an input step of the test on screen (wizard: that step; speed sheet: scroll to its row).
+// Where a step is drawn on the Speed Sheet: its row, and its calculated-value element when it has one.
+function findStepElements(stepKey) {
+  const rows = [...document.querySelectorAll("[data-step-row]")].filter(el => el.dataset.stepRow === stepKey);
+  const calc = [...document.querySelectorAll("[data-calc]")].find(el => el.getAttribute("data-calc") === stepKey) || null;
+  const calcRow = calc && calc.closest("[data-step-row]");
+  const row = (calcRow && rows.includes(calcRow))
+    ? calcRow
+    : (rows.find(el => el.querySelector("input, select, textarea")) || rows[0] || null);
+  return { row, calc };
+}
+
+// Take the technician to a step of the test on screen: the Speed Sheet, every accordion around the row
+// opened, the row scrolled into view, and an input focused. Returns what it found (see findStepElements),
+// so a caller can go further, or null when the test on screen has no such step.
 function jumpToStep(stepKey) {
-  const def = TestDefinitions[Nav.activeTestType];
-  // Match the structural logic of the Wizard UI!
-  const mainSteps = def ? def.sequence.filter(s => !s.home && !s.fetch && !s.resolver) : [];
-  const index = mainSteps.findIndex(s => s.key === stepKey);
-  if (index < 0) return;
-  navigateTo({ stepIndex: index });
-  const row = document.querySelector(`[data-step-row="${stepKey}"]`);
-  if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+  const step = findStep(stepKey);
+  if (!step) return null;
+  navigateTo({ mode: "SPEED", stepIndex: 0 });
+  const found = findStepElements(stepKey);
+  for (let parent = found.row && found.row.parentElement; parent; parent = parent.parentElement) {
+    if (parent.matches("details")) parent.open = true;
+  }
+  if (found.row) found.row.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (step.type !== "computed" && found.row) {
+    const control = found.row.querySelector("input, select, textarea");
+    if (control) control.focus({ preventScroll: true });
+  }
+  return found;
+}
+
+// Follow a dependency route (the chain of steps from buildDependencyTrace) to the test that owns its end.
+// Each time the chain crosses into another test, go to the record that value is fetched from.
+// Returns true when we end up on the test the route leads to, false when a source record cannot be found.
+function followDependencyRoute(route, targetType) {
+  for (const edge of route) {
+    if (edge.fromType === edge.toType) continue;
+    const consumerStep = findStep(edge.fromKey);
+    const resolver = consumerStep && consumerStep.fetch && SourceResolvers[consumerStep.fetch];
+    const context = getActiveContext();
+    const where = resolver && resolver.locate ? resolver.locate(context) : null;
+    if (!where) return false;
+    goToSource(where, context);
+  }
+  return Nav.activeTestType === targetType;
 }
 
 // "Select this record at this level": its id, plus whatever the tree config says to reset below it (clearNav).
@@ -175,7 +214,7 @@ function createTreeRow({ icon, title, isLeaf = false, isActive = false, isOpen =
   row.innerHTML = `
     <span class="tree-arrow">${isLeaf ? "•" : (isOpen ? "▼" : "▶")}</span>
     <span class="tree-icon">${icon}</span>
-    <span class="tree-title">${title}</span>
+    <span class="tree-title">${escapeHtml(title)}</span>
   `;
   const childContainer = document.createElement("div");
   childContainer.className = "tree-children";

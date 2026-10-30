@@ -11,8 +11,12 @@
                                    (my time - an offset) among an ancestor's records,
                                    else a fallback value; never guess between equals
 
+   Every policy also states where it keeps its own bookkeeping on a record (storeKeys) and what an empty
+   choice looks like (emptyChoice), so a new record can be built from its test definition alone
+   (createTestRecord in qc-database.js).
+
    Nothing here knows about any particular industry: keys, levels and wording all
-   come from the PolicyConfigs the domain file defines (asphalt-tests.js), which must load first.
+   come from the PolicyConfigs the domain module defines (modules/asphalt/asphalt-policies.js), which must load first.
    ========================================================================= */
 
 const MS_PER_MINUTE = 60000;
@@ -51,6 +55,8 @@ function createParentPickerPolicy(config) {
   }
 
   return {
+    storeKeys: [],
+    emptyChoice: () => null,
     view(ctx) {
       const { items, target, status } = resolveTarget(ctx);
       const options = [], lines = [];
@@ -162,6 +168,8 @@ function createTimeProximityPolicy(config) {
   }
 
   return {
+    storeKeys: Object.values(keys || {}),
+    emptyChoice: () => ({ mode: "auto", parentId: null, subId: null }),
     view(ctx) {
       const { targetMs, fallbackVal, choice, candidates, suggested, picked } = resolveMatch(ctx);
       const options = [], lines = [];
@@ -275,6 +283,8 @@ function createLatestRecordPolicy(config) {
   }
 
   return {
+    storeKeys: config.matchStoreKey ? [config.matchStoreKey] : [],
+    emptyChoice: () => null,
     view(ctx) {
       const { best, all, manualChoice } = pick(ctx);
       const options = [], lines = [];

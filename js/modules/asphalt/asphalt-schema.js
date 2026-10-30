@@ -9,9 +9,11 @@ const DatabaseMap = {
     plant:   { label: "Plant", idKey: "plantId", navKey: "plantId", titleKey: "plantName", icon: "🏭", navigationTitle: (r, id) => r.plantName || id },
     sample:  { label: "Truck Sample", idKey: "sampleId", navKey: "sampleId", titleKey: "timestamp", icon: "🕒", navigationTitle: (r, id) => `Sample @ ${shortStamp(r.timestamp || r.sampleId || id)}` }
   },
-  tests: {
-    ...Object.fromEntries(Object.entries(TestDefinitions).map(([type, test]) => [type, test.database]))
-  },
+  // Where each test's records live (from its definition) and how a new one is made (createTestRecord).
+  tests: Object.fromEntries(Object.entries(TestDefinitions).map(([type, test]) => [
+    type,
+    { ...test.database, create: parent => createTestRecord(type, parent) }
+  ])),
   tree: {
     project: { holds: [{
       collection: "mixes",
@@ -38,7 +40,7 @@ const DatabaseMap = {
         create: (mix, values) => {
           const id = `PLANT-${nextNumber(mix.plants)}`;
           const plant = createDatabaseRecord(mix, "plants", id, { plantId: id, plantName: values.name, transitMinutes: DEFAULT_HAUL_MINUTES, samples: {}, cores: {}, calibrations: {}, drybackCorrections: {}, results: {} });
-          addDrybackCorrection(plant);
+          createTestRecord("drybackCorrection", plant);
           return plant;
         }
       }
@@ -63,19 +65,18 @@ const DatabaseMap = {
     sample: { holds: [] }
   },
   views: {
-    plant: {
-      id: "plant",
+    plantSummary: {
+      id: "plantSummary",
       parent: "plant",
       icon: "📊",
       navigationLabel: "Plant Production Summary",
       contextTitle: "{name} · Production Summary",
       cardTitle: "Daily Plant & Mat Summary",
       description: "Aggregate multi-test results for {name}.",
-      calculate: calculatePlantResults,
       metrics: [
-        { key: "dailyAverageGmm", label: "Daily Average Rice Gmm", caption: "Loose Mix Plant Average", countCollection: "samples", countLabel: "Samples", decimals: 3, unit: "" },
-        { key: "averageCoreGmb", label: "Average Core Gmb", caption: "Roadway Mat Average", countCollection: "cores", countLabel: "Cores", decimals: 3, unit: "" },
-        { key: "averageMatDensity", label: "Average In-Place Mat Density", caption: "In-Place Pavement Compaction", decimals: 1, unit: "%" }
+        { key: "dailyAverageGmm", label: "Daily Average Rice Gmm", caption: "Loose Mix Plant Average", countCollection: "samples", countLabel: "Samples", decimals: 3, unit: "", average: { path: ["samples", "riceTests"], field: "measuredGmm" } },
+        { key: "averageCoreGmb", label: "Average Core Gmb", caption: "Roadway Mat Average", countCollection: "cores", countLabel: "Cores", decimals: 3, unit: "", average: { path: ["cores"], field: "coreGmb" } },
+        { key: "averageMatDensity", label: "Average In-Place Mat Density", caption: "In-Place Pavement Compaction", decimals: 1, unit: "%", average: { path: ["cores"], field: "matDensityPercent" } }
       ]
     }
   },
@@ -92,13 +93,14 @@ const DatabaseMap = {
       { key: "mixName", label: "Mix Design Name:", placeholder: "e.g. 9.5mm Superpave" },
       { key: "plantName", label: "Plant Facility Name:", placeholder: "e.g. North Drum Plant" }
     ],
+    // Builds project > mix > plant with the same "add" actions the navigation tree uses, and selects what it made.
     create: (db, values) => {
+      const childAction = (level, node) => DatabaseMap.tree[level].holds.find(hold => hold.node === node).navigation;
       const jobId = values.jobId.trim();
       const project = DatabaseMap.rootNavigation.create(db, { jobId, projectName: values.jobName.trim() || jobId });
-      const mixId = "MIX-1", plantId = "PLANT-1";
-      const mix = DatabaseMap.tree.project.holds[0].navigation.create(project, { name: values.mixName.trim() || "Surface Mix" });
-      DatabaseMap.tree.mix.holds[0].navigation.create(mix, { name: values.plantName.trim() || "Main Plant" });
-      return { projectId: jobId, mixId, plantId, sampleId: null, activeTestType: null, activeTestId: null };
+      const mix = childAction("project", "mix").create(project, { name: values.mixName.trim() || "Surface Mix" });
+      const plant = childAction("mix", "plant").create(mix, { name: values.plantName.trim() || "Main Plant" });
+      return { projectId: project.projectId, mixId: mix.mixId, plantId: plant.plantId, sampleId: null, activeTestType: null, activeTestId: null };
     }
   },
   rootNavigation: {

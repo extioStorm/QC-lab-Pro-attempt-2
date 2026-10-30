@@ -57,7 +57,7 @@ function renderLanding(container) {
   setContextBar(`${getNodeIcon(level)} ${title}`);
   const card = document.createElement("div");
   card.className = "card";
-  card.innerHTML = `<div class="card-title">${getNodeIcon(level)} ${title}</div><div class="instruction">${def.label || level}. Pick something in the tree, or use the actions below.</div>`;
+  card.innerHTML = `<div class="card-title">${getNodeIcon(level)} ${escapeHtml(title)}</div><div class="instruction">${def.label || level}. Pick something in the tree, or use the actions below.</div>`;
   
   (DatabaseMap.tree[level].holds || []).forEach(h => {
     const collection = h.collection || DatabaseMap.tests[h.test].collection;
@@ -105,7 +105,7 @@ function renderDeclaredView(container, definition) {
   const results = scope[definition.resultsCollection || "results"] || {};
   const card = document.createElement("div");
   card.className = "card";
-  card.innerHTML = `<div class="card-title">${definition.icon || "📄"} ${definition.cardTitle || definition.id}</div><div class="instruction">${format(definition.description)}</div>`;
+  card.innerHTML = `<div class="card-title">${definition.icon || "📄"} ${definition.cardTitle || definition.id}</div><div class="instruction">${escapeHtml(format(definition.description))}</div>`;
   
   (definition.metrics || []).forEach(metric => {
     const row = document.createElement("div");

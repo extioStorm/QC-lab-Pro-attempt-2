@@ -1,4 +1,8 @@
 // @ts-nocheck
+// The inspector: the drawer that opens on a calculated value to show where it comes from and let the
+// person override it. It only draws and reacts. The dependency graph comes from qc-calculations.js
+// (directDependencies, buildDependencyTrace, dependencyLabel) and getting around from qc-navigation.js
+// (jumpToStep, followDependencyRoute).
 function handleScaleInput(fieldKey, rawValue) {
   const ctx = getActiveContext();
   if (!ctx.record) return;
@@ -50,6 +54,7 @@ function handleSourceSwap(fieldKey, value) {
   updateCalculatedDisplays();
   saveToStorage();
   renderScreen();
+  reopenInspector(fieldKey);
 }
 
 function updateCalculatedDisplays() {
@@ -68,134 +73,32 @@ function updateCalculatedDisplays() {
   });
 }
 
-
-function directInspectorDependencies(step, type = Nav.activeTestType) {
-  const dependencies = [];
-  const seen = new Map();
-  const add = (depType, key, relation) => {
-    const id = depType + "." + key;
-    if (seen.has(id)) {
-      const existing = seen.get(id);
-      if (!existing.relations.includes(relation)) existing.relations.push(relation);
-      return;
-    }
-    const dep = { type: depType, key, relations: [relation] };
-    seen.set(id, dep);
-    dependencies.push(dep);
-  };
-
-  // "from" describes formula inputs, or the values used to choose a fetched source.
-  (step && step.from || []).forEach(key =>
-    add(type, key, step && step.fetch ? "source selection" : "calculation")
-  );
-  // "reads" identifies values actually read from another test/record.
-  readsOf(step).forEach(read => add(read.type, read.key, "source value"));
-  return dependencies;
+// Open the inspector on a calculated value that is drawn on screen (a screen redraw closes it).
+function reopenInspector(outputKey) {
+  const { calc } = findStepElements(outputKey);
+  const card = calc && (calc.closest(".speed-card") || calc.closest(".card"));
+  if (card) toggleInspector(outputKey, card);
 }
 
-function inspectorNodeId(type, key) {
-  return type + "." + key;
-}
-
-function buildInspectorTrace(type, key) {
-  const nodes = new Map();
-
-  function visit(nodeType, nodeKey, route, ancestors) {
-    const id = inspectorNodeId(nodeType, nodeKey);
-    if (ancestors.has(id)) return null;
-
-    let node = nodes.get(id);
-    if (!node) {
-      node = { id, type: nodeType, key: nodeKey, route, dependencies: [], depth: 0 };
-      nodes.set(id, node);
-    }
-    if (node.visited) return node;
-    node.visited = true;
-
-    const nextAncestors = new Set(ancestors);
-    nextAncestors.add(id);
-    directInspectorDependencies(stepOf(nodeType, nodeKey), nodeType).forEach(dep => {
-      const edge = { fromType: nodeType, fromKey: nodeKey, toType: dep.type, toKey: dep.key };
-      const child = visit(dep.type, dep.key, route.concat(edge), nextAncestors);
-      if (child) node.dependencies.push({ ...dep, node: child });
-    });
-    return node;
+// A dependency was tapped: go to where that value lives (it may be in another test) and show it.
+function goToDependency(route, type, key) {
+  if (!followDependencyRoute(route, type)) {
+    alert("There is no saved record to open for this value yet.");
+    return;
   }
-
-  const root = visit(type, key, [], new Set());
-  const depthOf = (node, visiting = new Set()) => {
-    if (visiting.has(node.id) || !node.dependencies.length) return 0;
-    const next = new Set(visiting);
-    next.add(node.id);
-    node.depth = 1 + Math.max(...node.dependencies.map(dep => depthOf(dep.node, next)));
-    return node.depth;
-  };
-  if (root) depthOf(root);
-  return { root, nodes: [...nodes.values()] };
-}
-
-function inspectorLabel(type, key) {
-  const step = stepOf(type, key);
-  const testTitle = TestDefinitions[type] && TestDefinitions[type].title;
-  return (step ? step.label : key) +
-    (type !== Nav.activeTestType ? " · " + (testTitle || type) : "");
-}
-
-function focusInspectorDependency(key) {
-  const step = stepOf(Nav.activeTestType, key);
-  if (!step) return;
-
-  // The speed sheet exposes a stable row for main steps and prerequisites.
-  Nav.mode = "SPEED";
-  navigateTo({ mode: "SPEED", stepIndex: 0 });
-
-  const rows = [...document.querySelectorAll("[data-step-row]")]
-    .filter(el => el.dataset.stepRow === key);
-  const calc = [...document.querySelectorAll("[data-calc]")]
-    .find(el => el.getAttribute("data-calc") === key);
-  const controlRow = rows.find(el => el.querySelector("input, select, textarea"));
-  const calcRow = calc && calc.closest("[data-step-row]");
-  const row = calcRow && rows.includes(calcRow) ? calcRow : (controlRow || rows[0]);
-
-  // Open every accordion containing the target before scrolling or focusing it.
-  for (let parent = row && row.parentElement; parent; parent = parent.parentElement) {
-    if (parent.matches("details")) parent.open = true;
-  }
-  if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
-
-  if (step.type === "computed" && calc) {
-    const card = calc.closest(".speed-card") || calc.closest(".card");
-    if (card) toggleInspector(key, card);
-  } else {
-    const control = row && row.querySelector("input, select, textarea");
-    if (control) control.focus({ preventScroll: true });
-  }
-}
-
-function navigateInspectorRoute(route, type, key) {
-  for (const edge of route) {
-    if (edge.fromType === edge.toType) continue;
-    const consumerStep = stepOf(Nav.activeTestType, edge.fromKey);
-    const resolver = consumerStep && consumerStep.fetch && SourceResolvers[consumerStep.fetch];
-    const context = getActiveContext();
-    const where = resolver && resolver.locate ? resolver.locate(context) : null;
-    if (!where) return;
-    goToSource(where, context);
-  }
-  if (Nav.activeTestType !== type) return;
-  focusInspectorDependency(key);
+  const step = findStep(key);
+  const found = jumpToStep(key);
+  if (found && step && step.type === "computed") reopenInspector(key);
 }
 
 function renderInspectorFullTrace(drawer, outputKey, type) {
   const details = document.createElement("details");
   details.className = "inspector-full-trace";
-  details.style.cssText = "margin-top:0.75rem;padding-top:0.6rem;border-top:1px solid var(--panel-border);";
   const summary = document.createElement("summary");
   summary.textContent = "Full dependency trace";
-  summary.style.cssText = "cursor:pointer;font-weight:700;font-size:0.85rem;";
   details.appendChild(summary);
 
-  const trace = buildInspectorTrace(type, outputKey);
+  const trace = buildDependencyTrace(type, outputKey);
   if (!trace.root || !trace.root.dependencies.length) {
     const empty = document.createElement("div");
     empty.className = "dependency-detail";
@@ -206,53 +109,51 @@ function renderInspectorFullTrace(drawer, outputKey, type) {
   }
 
   const body = document.createElement("div");
-  body.style.cssText = "margin-top:0.6rem;display:flex;flex-direction:column;gap:0.65rem;";
+  body.className = "trace-body";
   trace.nodes.filter(node => node.dependencies.length)
     .sort((a, b) => a.depth - b.depth || a.id.localeCompare(b.id))
     .forEach(node => {
       const group = document.createElement("div");
-      group.style.cssText = "padding:0.55rem;border:1px solid var(--panel-border);border-radius:0.45rem;";
+      group.className = "trace-group";
       const level = document.createElement("div");
-      level.className = "dependency-detail";
-      level.style.cssText = "font-size:0.72rem;color:var(--muted);margin-bottom:0.35rem;";
+      level.className = "trace-level";
       level.textContent = "Calculation level " + node.depth;
       group.appendChild(level);
 
       const inputs = document.createElement("div");
-      inputs.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:0.3rem;";
+      inputs.className = "trace-inputs";
       node.dependencies.forEach((dep, index) => {
         if (index) {
           const separator = document.createElement("span");
+          separator.className = "trace-sep";
           separator.textContent = "+";
-          separator.style.color = "var(--muted)";
           inputs.appendChild(separator);
         }
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "btn-secondary";
-        button.style.cssText = "font-size:0.78rem;padding:0.3rem 0.45rem;";
-        button.textContent = inspectorLabel(dep.type, dep.key);
+        button.className = "btn-secondary trace-chip";
+        button.textContent = dependencyLabel(dep.type, dep.key);
         button.title = dep.relations.join("; ");
-        button.onclick = () => navigateInspectorRoute(dep.node.route, dep.type, dep.key);
+        button.onclick = () => goToDependency(dep.node.route, dep.type, dep.key);
         inputs.appendChild(button);
       });
       group.appendChild(inputs);
 
       const arrow = document.createElement("div");
+      arrow.className = "trace-arrow";
       arrow.textContent = "↓";
-      arrow.style.cssText = "text-align:center;color:var(--muted);margin:0.15rem 0;";
       group.appendChild(arrow);
 
       const output = document.createElement("div");
-      output.style.cssText = "font-weight:700;font-size:0.82rem;";
-      output.textContent = inspectorLabel(node.type, node.key);
+      output.className = "trace-output";
+      output.textContent = dependencyLabel(node.type, node.key);
       group.appendChild(output);
       body.appendChild(group);
     });
 
   const final = document.createElement("div");
-  final.style.cssText = "font-weight:700;text-align:center;padding:0.45rem;";
-  final.textContent = "Inspected value: " + inspectorLabel(type, outputKey);
+  final.className = "trace-final";
+  final.textContent = "Inspected value: " + dependencyLabel(type, outputKey);
   body.appendChild(final);
   details.appendChild(body);
   drawer.appendChild(details);
@@ -276,18 +177,16 @@ function toggleInspector(outputKey, cardEl) {
   const drawer = document.createElement("div");
   drawer.className = "dependency-box";
   drawer.innerHTML =
-    '<div class="dependency-title">🔍 Inspect: ' + outputKey + '</div>' +
+    '<div class="dependency-title">🔍 Inspect: ' + escapeHtml(outputKey) + '</div>' +
     '<div class="dependency-detail">Status: <strong>' +
       (isManual ? "🟡 Manual Override Active" : "🟢 Auto Calculated") + '</strong></div>' +
     '<div class="dependency-detail"><strong>Direct dependencies</strong></div>' +
     '<div class="dependency-direct-list"></div>' +
     '<div class="dependency-source"></div>' +
-    '<div style="margin-top:0.75rem;padding-top:0.6rem;border-top:1px solid var(--panel-border);">' +
-      '<label style="font-size:0.8rem;">Manual Override Value:</label>' +
-      '<input type="number" step="any" placeholder="Type override number..." ' +
-        'style="height:38px;font-size:0.95rem;margin:0.3rem 0;">' +
-      '<button class="btn-action" style="background:' +
-        (isManual ? 'var(--warning)' : 'var(--accent)') + ';color:black;">' +
+    '<div class="dependency-section">' +
+      '<label class="override-label">Manual Override Value:</label>' +
+      '<input type="number" class="override-input" step="any" placeholder="Type override number...">' +
+      '<button class="btn-action override-btn' + (isManual ? ' is-manual' : '') + '">' +
         (isManual ? "Switch Back to Auto Value" : "Turn ON Manual Override") +
       '</button></div>';
 
@@ -300,15 +199,14 @@ function toggleInspector(outputKey, cardEl) {
     const view = SourceResolvers[step.fetch].view(getActiveContext());
     const source = drawer.querySelector(".dependency-source");
     if ((view.options && view.options.length) || (view.lines && view.lines.length)) {
-      source.style.cssText = "margin-top:0.75rem;padding-top:0.6rem;border-top:1px solid var(--panel-border);";
+      source.classList.add("dependency-section");
       if (view.options && view.options.length) {
         const label = document.createElement("label");
+        label.className = "dependency-source-label";
         label.textContent = "🔗 Attached Calibration / Source:";
-        label.style.cssText = "font-size:0.8rem;font-weight:700;color:var(--text);";
         source.appendChild(label);
         const select = document.createElement("select");
         select.className = "step-select";
-        select.style.marginTop = "0.3rem";
         view.options.forEach(option => {
           const item = document.createElement("option");
           item.value = option.value;
@@ -322,7 +220,6 @@ function toggleInspector(outputKey, cardEl) {
       (view.lines || []).forEach(line => {
         const div = document.createElement("div");
         div.className = "src-line" + (line.tone ? " src-" + line.tone : "");
-        div.style.fontSize = "0.78rem";
         div.textContent = line.text;
         source.appendChild(div);
       });
@@ -330,14 +227,13 @@ function toggleInspector(outputKey, cardEl) {
   }
 
   const dependencyList = drawer.querySelector(".dependency-direct-list");
-  directInspectorDependencies(step, type).forEach(dep => {
+  directDependencies(type, outputKey).forEach(dep => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "btn-secondary";
-    button.style.cssText = "display:block;width:100%;text-align:left;margin-top:0.35rem;";
-    button.textContent = inspectorLabel(dep.type, dep.key);
+    button.className = "btn-secondary dependency-direct-btn";
+    button.textContent = dependencyLabel(dep.type, dep.key);
     button.title = dep.relations.join("; ");
-    button.onclick = () => navigateInspectorRoute([
+    button.onclick = () => goToDependency([
       { fromType: type, fromKey: outputKey, toType: dep.type, toKey: dep.key }
     ], dep.type, dep.key);
     dependencyList.appendChild(button);
@@ -359,6 +255,7 @@ function setManualOverride(outputKey, rawValue) {
   updateCalculatedDisplays();
   saveToStorage();
   renderScreen();
+  reopenInspector(outputKey);
 }
 
 function toggleOverrideSwitch(outputKey) {
@@ -372,4 +269,5 @@ function toggleOverrideSwitch(outputKey) {
   updateCalculatedDisplays();
   saveToStorage();
   renderScreen();
+  reopenInspector(outputKey);
 }

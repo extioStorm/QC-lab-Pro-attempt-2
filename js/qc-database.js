@@ -14,12 +14,11 @@ function roundHalfToEven(value, decimals = 3) {
   }
   return (rounded * sign) / factor;
 }
-const DATA_TYPES = {
-  MASS:    { decimals: 1, unit: "g",   step: "0.1" },
-  VOLUME:  { decimals: 1, unit: "cm³", step: "0.1" },
-  GRAVITY: { decimals: 3, unit: "",    step: "0.001" },
-  PERCENT: { decimals: 1, unit: "%",   step: "0.1" }
-};
+// Text typed by the person (job names, plant names...) is shown through innerHTML in places; escape it first.
+function escapeHtml(text) {
+  return String(text === null || text === undefined ? "" : text)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 function createOverridable(initialAuto = null) {
   return { auto: initialAuto, manual: null, isManual: false };
 }
@@ -46,6 +45,43 @@ function createDatabaseRecord(parent, collection, id, record) {
   if (!parent[collection] || typeof parent[collection] !== "object") parent[collection] = {};
   parent[collection][id] = record;
   return record;
+}
+// Make a new, empty record for a test straight from its definition (TestDefinitions[type]), so the
+// definition is the only place a record's shape is written down:
+//   input step          -> null          computed step  -> an overridable value
+//   choice step         -> what its source policy calls an empty choice
+//   datetime step       -> now, with its "automatic" flag set (and the time it was created, when it keeps one)
+//   fetched step        -> also the bookkeeping fields its source policy stores (storeKeys)
+//   `home` step         -> nothing: that value lives on an ancestor, not on this record
+// `database` on the definition says where the record goes and how its id looks:
+//   { parent, collection, idKey, idPrefix?, idPad?, defaults? }  (defaults = fields every new record starts with)
+function createTestRecord(type, parent, overrides = {}) {
+  const definition = TestDefinitions[type];
+  const database = definition.database;
+  const now = getIsoTimestamp();
+  const number = nextNumber(parent[database.collection]);
+  const id = database.idPrefix
+    ? database.idPrefix + String(number).padStart(database.idPad || 0, "0")
+    : String(number);
+  const record = { [database.idKey]: id };
+  definition.sequence.forEach(step => {
+    if (step.home) return;
+    if (step.type === "computed") {
+      record[step.key] = createOverridable();
+    } else if (step.type === "choice") {
+      record[step.key] = SourceResolvers[step.resolver].emptyChoice();
+    } else if (step.type === "datetime") {
+      record[step.key] = now;
+      if (step.autoKey) record[step.autoKey] = true;
+      if (step.autoValueKey) record[step.autoValueKey] = now;
+    } else {
+      record[step.key] = null;
+    }
+    const resolver = step.fetch && SourceResolvers[step.fetch];
+    if (resolver) resolver.storeKeys.forEach(key => { record[key] = null; });
+  });
+  Object.assign(record, database.defaults, overrides);
+  return createDatabaseRecord(parent, database.collection, id, record);
 }
 function getIsoTimestamp(date = new Date()) {
   const pad = n => String(n).padStart(2, "0");

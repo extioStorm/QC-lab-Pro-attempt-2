@@ -28,6 +28,17 @@ function stepOf(type, key) {
 function isPrereqStep(step) {
   return Boolean(step && !step.section && (step.home || step.fetch || step.resolver));
 }
+// A test's steps (prerequisites left out) as consecutive sections: [{ name, steps }]. Steps without a
+// section form one of their own, named "".
+function stepSections(testDef) {
+  const sections = [];
+  testDef.sequence.filter(step => !isPrereqStep(step)).forEach(step => {
+    const name = step.section || "";
+    if (!sections.length || sections[sections.length - 1].name !== name) sections.push({ name, steps: [] });
+    sections[sections.length - 1].steps.push(step);
+  });
+  return sections;
+}
 function valueOf(type, record, ctx, key) {
   const step = stepOf(type, key);
   if (step && step.type === "computed") return resolve(record[key]);

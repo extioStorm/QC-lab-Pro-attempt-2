@@ -299,9 +299,10 @@ function testRecordTitle(type, record, id) {
   const definition = TestDefinitions[type], nav = definition.navigation || {};
   return nav.itemLabel ? nav.itemLabel(record, id) : `${definition.title} #${id}`;
 }
-// Open one record of a test. `context` is the Nav ids of the levels above it.
-function openTestRecord(type, id, context) {
-  navigateTo(Object.assign({}, context, { activeTestType: type, activeTestId: id }));
+// Open one record of a test, at its first page. `context` is the Nav ids of the levels above it; `extra` adds
+// more Nav settings (a mode, a page).
+function openTestRecord(type, id, context, extra = {}) {
+  navigateTo(Object.assign({}, context, { activeTestType: type, activeTestId: id, stepIndex: 0 }, extra));
 }
 // A test record as a tree row (tap opens it). `parentActive`: its parent is the selected record.
 function buildTestRecordRow(type, record, context, parentActive = false) {
@@ -346,7 +347,13 @@ function renderLensBlock(container) {
     isOpen: true,
     getChildren: rows => {
       if (!win) { rows.appendChild(buildTestAddRow(lens.window.type, scope, context, lens.startLabel)); return; }
-      lens.entries.forEach((entry, i) => rows.appendChild(buildLensEntryRow(entry, `${i + 1}. ${entry.label}`, lens, scope, win, context, ctx)));
+      const numbers = new Map(lens.groups.flatMap(group => group.entries).map((entry, i) => [entry, i + 1]));
+      lens.groups.forEach(group => rows.appendChild(createTreeRow({
+        icon: group.icon || "📂",
+        title: group.label,
+        isOpen: true,
+        getChildren: groupRows => group.entries.forEach(entry => groupRows.appendChild(buildLensEntryRow(entry, `${numbers.get(entry)}. ${entry.label}`, lens, scope, win, context, ctx)))
+      })));
     }
   }));
 }
@@ -363,10 +370,10 @@ function buildLensEntryRow(entry, title, lens, scope, win, context, ctx) {
       icon: mark(filled === steps.length),
       title: `${title} · ${filled}/${steps.length}${warning ? ` · ⚠ ${entry.warn.warnLabel}: ${warning}` : ""}`,
       isLeaf: true,
-      onSelect: () => {
-        openTestRecord(type, win.record[DatabaseMap.tests[type].idKey], context);
-        if (steps.length) jumpToStep(steps[0].key);
-      }
+      onSelect: () => openTestRecord(type, win.record[DatabaseMap.tests[type].idKey], context, {
+        mode: "INTERACTIVE",
+        stepIndex: Math.max(0, stepSections(TestDefinitions[type]).findIndex(section => section.name === entry.section))
+      })
     });
   }
   const { records, notDone } = recordsInWindow(scope, entry, win);

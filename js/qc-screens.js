@@ -311,26 +311,61 @@ function renderSpeedMode(container) {
   const card = buildCard(`⚡ Speed Sheet — ${testDef.title.toUpperCase()} #${Nav.activeTestId}`);
   const prereqSteps = testDef.sequence.filter(isPrereqStep);
   if (prereqSteps.length > 0) card.appendChild(renderPrereqSection(prereqSteps, record));
-  // Steps with a `section` go into one collapsible box per section, in the order the sections first appear.
-  const sections = new Map();
-  testDef.sequence.filter(step => !isPrereqStep(step)).forEach(step => {
-    if (!step.section) { card.appendChild(buildStepRow(step, record)); return; }
-    if (!sections.has(step.section)) {
-      const box = buildFoldBox(step.section, "", `${Nav.activeTestType}:${step.section}`);
-      card.appendChild(box.details);
-      sections.set(step.section, box.body);
-    }
-    sections.get(step.section).appendChild(buildStepRow(step, record, "inset"));
-  });
-
+  appendSectionSteps(card, stepSections(testDef), record, `${Nav.activeTestType}:optional`);
   container.appendChild(card);
+}
+
+// Lay sections of steps out on a card: each section's important steps open under its name, and the `optional`
+// ones (checklists, extra info) folded into one "Checklists & Optional Info" box, under their section names.
+// A single section made only of optional steps (a checklist page) is shown open.
+function appendSectionSteps(card, sections, record, openKey) {
+  const box = buildFoldBox("📋 Checklists & Optional Info", "", openKey);
+  const single = sections.length === 1;
+  sections.forEach(section => {
+    const showAll = single && section.steps.every(step => step.optional);
+    const open = section.steps.filter(step => showAll || !step.optional);
+    const folded = section.steps.filter(step => !showAll && step.optional);
+    if (open.length && section.name && !single) card.appendChild(el("div", "section-label", section.name));
+    open.forEach(step => card.appendChild(buildStepRow(step, record)));
+    if (folded.length && section.name && !single) box.body.appendChild(el("div", "section-label", section.name));
+    folded.forEach(step => box.body.appendChild(buildStepRow(step, record, "inset")));
+  });
+  if (box.body.children.length) card.appendChild(box.details);
+}
+
+// Back / Next between wizard pages.
+function buildWizardNav(index, count, nextLabel) {
+  const navRow = el("div", "wizard-nav");
+  if (index > 0) {
+    const backBtn = el("button", "btn-secondary", "← Back");
+    backBtn.onclick = () => { Nav.stepIndex = index - 1; renderScreen(); };
+    navRow.appendChild(backBtn);
+  }
+  if (index < count - 1) {
+    const nextBtn = el("button", "btn-primary", nextLabel);
+    nextBtn.onclick = () => { Nav.stepIndex = index + 1; renderScreen(); };
+    navRow.appendChild(nextBtn);
+  }
+  return navRow;
 }
 
 function renderWizardMode(container) {
   const record = getActiveRecord();
   const testDef = TestDefinitions[Nav.activeTestType];
   if (!record || !testDef) return;
-  
+
+  // A test with sections is walked one section (a chunk of tasks) per page.
+  const sections = stepSections(testDef);
+  if (sections.some(section => section.name)) {
+    const index = Math.min(Nav.stepIndex, sections.length - 1);
+    const section = sections[index];
+    const chunk = buildCard(`${index + 1} of ${sections.length}: ${section.name || testDef.title}`);
+    appendSectionSteps(chunk, [section], record, `${Nav.activeTestType}:optional:${section.name}`);
+    chunk.appendChild(buildWizardNav(index, sections.length, `${sections[index + 1] ? sections[index + 1].name : ""} →`));
+    container.appendChild(chunk);
+    return;
+  }
+
   const steps = testDef.sequence.filter(step => !isPrereqStep(step));
   if (steps.length === 0) return; // Failsafe
   
@@ -338,7 +373,6 @@ function renderWizardMode(container) {
   const step = steps[stepIndex];
   
   const card = buildCard(`Step ${stepIndex + 1} of ${steps.length}: ${step.label}`, step.instruction || "Record the required measurement below.");
-  if (step.section) card.prepend(el("div", "section-label", step.section));
   if (step.type === "input") {
     const group = el("div", "field-group");
     group.appendChild(el("label", "", `${step.label} (${step.unit})`));
@@ -358,18 +392,7 @@ function renderWizardMode(container) {
     const missing = buildDependencyLinks(step, true);
     if (missing) card.appendChild(missing);
   }
-  const navRow = el("div", "wizard-nav");
-  if (stepIndex > 0) {
-    const backBtn = el("button", "btn-secondary", "← Back");
-    backBtn.onclick = () => { Nav.stepIndex = stepIndex - 1; renderScreen(); };
-    navRow.appendChild(backBtn);
-  }
-  if (stepIndex < steps.length - 1) {
-    const nextBtn = el("button", "btn-primary", "Next Step →");
-    nextBtn.onclick = () => { Nav.stepIndex = stepIndex + 1; renderScreen(); };
-    navRow.appendChild(nextBtn);
-  }
-  card.appendChild(navRow);
+  card.appendChild(buildWizardNav(stepIndex, steps.length, "Next Step →"));
   container.appendChild(card);
 }
 

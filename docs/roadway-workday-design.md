@@ -139,6 +139,11 @@ The Red Book and Diary need a day picker: choose a Workday Log, and the lens fil
 ## Suggested build order
 1. Framework items 1-2, then Workday Log, which gives the checklist and haul capture. **Done:** step types `check`, `text`, `select`; `step.section` (collapsible, stays open across redraws; wizard shows the section name); Workday Log in `js/modules/asphalt/asphalt-roadway.js`; `ratePerInch` on new mixes and `sublotLengthFt` on new projects.
 2. Framework item 5 (lens block) with the roadway lens, so the checklist can be walked in order. **Done:** `WorkdayLenses` in `asphalt-roadway.js` (declared as `DatabaseMap.lenses`), drawn by `renderLensBlock` above the tree for the selected plant. It uses the latest Workday Log by start time (or offers "Start Today's Workday"); cores count toward the day by `systemCreatedAt` within the log's start/end. Section progress counts filled steps, so prefilled defaults (haul 30, offset 88, 110, 3000) count as filled. Mat Temps, Break the Mat and Day Events entries are added when those records are built. With one lens there is no lens switcher yet, so nothing is saved in `Nav` for it. Tree and lens share `buildTestRecordRow`, `buildTestAddRow` and `testRecordTitle`.
+2b. **Done (after review with the technician):**
+   - Steps marked `optional` (checklists, extra info) fold into one "📋 Checklists & Optional Info" box; important steps (affect a test, or go in the Red Book / Diary) are shown open under their section names. A page that is only a checklist is shown open.
+   - Step Wizard on a test with sections walks one section (a chunk of tasks) per page; Speed Sheet still shows the whole record. Lens entries open the Workday Log in the wizard at their section.
+   - Lens entries are grouped: At the plant (morning), On the jobsite, Back at the plant.
+   - PQI setup: target reading % (default 88) and offset in MTD units; replaces start/adjusted offset.
 3. Mat Temp, Day Event, core field steps (including core kind, lot and sublot).
 4. Framework item 3 plus the Red Book and Diary lenses.
 5. Break the Mat (needs item 4) and Open Follow-ups.

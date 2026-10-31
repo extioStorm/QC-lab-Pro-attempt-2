@@ -38,7 +38,7 @@ TestDefinitions.workdayLog = {
 
     { key: "pqiTargetPercent", label: "Target Reading, Uncompacted Mat", type: "input", unit: "%", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "What the gauge is calibrated to read before rolling. 88% on older pavers; newer screeds may need up to about 91%." },
     { key: "pqiPresetMix", label: "Gauge Mix Preset", type: "text", section: "PQI Setup", instruction: "The mix preset selected on the gauge, so readings use consistent settings. The gauge also needs the mix's nominal size (on the mix's page, under Mix & job info)." },
-    { key: "pqiDepth", label: "Gauge Depth", type: "input", unit: "in", decimals: 2, step: "0.25", section: "PQI Setup", instruction: "Depth set on the gauge; it matters relative to the lift thickness. The expected lift is on the mix's page (Mix & job info): its paving rate / 110." },
+    { key: "pqiDepth", label: "Gauge Depth", type: "input", unit: "in", decimals: 2, step: "0.25", section: "PQI Setup", instruction: "Depth set on the gauge; it matters relative to the lift thickness. The placement shows the expected lift (paving rate / 110)." },
     { key: "pqiOffset", label: "Offset", type: "input", unit: "MTD", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "In MTD units, + or -. A -4 offset turns a 145 reading into 141. Found by trial and error." },
     { key: "pqiCalibrated", label: "PQI calibrated for this setup", type: "check", section: "PQI Setup", optional: true },
     { key: "pqiId", label: "PQI ID", type: "text", section: "PQI Setup", optional: true },
@@ -58,13 +58,6 @@ TestDefinitions.workdayLog = {
     ]),
 
     { key: "jobsiteAddress", label: "Address / GPS", type: "text", section: "Jobsite Setup", optional: true },
-    { key: "beginStation", label: "Begin Station", type: "text", section: "Jobsite Setup", instruction: "As written, e.g. 135+56." },
-    { key: "stationsRun", label: "Stations Run", type: "select", options: ["Increasing", "Decreasing"], section: "Jobsite Setup" },
-    { key: "lane", label: "Lane", type: "select", options: ["Inner", "Outer"], section: "Jobsite Setup" },
-    { key: "direction", label: "Direction", type: "text", section: "Jobsite Setup" },
-    { key: "matWidth", label: "Mat Width", type: "input", unit: "ft", decimals: 1, step: "0.1", section: "Jobsite Setup" },
-    { key: "rollingPattern", label: "Rolling Pattern", type: "text", section: "Jobsite Setup" },
-    { key: "rollingPatternSet", label: "Roller operator pattern established", type: "check", section: "Jobsite Setup", optional: true },
     { key: "inspectorName", label: "Inspector Name", type: "text", section: "Jobsite Setup", optional: true },
     { key: "inspectorPhone", label: "Inspector Phone", type: "text", section: "Jobsite Setup", optional: true },
 
@@ -73,12 +66,35 @@ TestDefinitions.workdayLog = {
     { key: "weatherConditions", label: "Conditions", type: "text", section: "Weather" },
     { key: "weatherRecordedAt", label: "Weather Recorded At", type: "datetime", section: "Weather", instruction: "Midday is a good time.", optional: true },
 
-    { key: "endStation", label: "End Station", type: "text", section: "Close Out" },
     { key: "labResultsRecorded", label: "Lab results recorded", type: "check", section: "Close Out", optional: true },
     { key: "handedOffToLabTech", label: "Handed off to other lab tech", type: "check", section: "Close Out", optional: true },
     { key: "shutDown", label: "Shut down", type: "check", section: "Close Out", optional: true },
     { key: "lockedUp", label: "Locked and secured", type: "check", section: "Close Out", optional: true },
     { key: "closeNotes", label: "Notes", type: "text", section: "Close Out" }
+  ]
+};
+
+// One mix laid from one plant on one day (a stream of trucks being placed): what goes on the Red Book's right page.
+// It sits under the plant (this mix as produced at this plant), with the samples and cores of the same stream.
+TestDefinitions.placement = {
+  id: "placement",
+  title: "Placement",
+  icon: "🛤️",
+  database: { parent: "plant", collection: "placements", idKey: "placementId", idPrefix: "PL-", idPad: 2 },
+  navigation: { group: true, groupIcon: "🛤️", collectionLabel: "Placements", addLabel: "Log Placement", itemLabel: (r, id) => `Placement ${shortStamp(r.placedAt)}${r.beginStation ? " · " + r.beginStation + (r.endStation ? " to " + r.endStation : "") : ""}` },
+  sequence: [
+    { key: "placedAt", label: "Placed On", type: "datetime", autoKey: "isUsingAutoTime", autoValueKey: "systemCreatedAt", autoHint: "automatic", manualHint: "entered", rerender: true, instruction: "When this mix started going down." },
+    { key: "pavingRate", label: "Paving Rate", type: "input", unit: "lb/yd²", decimals: 0, step: "1", instruction: "Ask the screed operator what rate they're setting." },
+    { key: "ratePerInch", home: "mix", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", instruction: "Kept on the mix; rule of thumb 110." },
+    { key: "expectedLift", label: "Expected Lift (set PQI depth to match)", type: "computed", from: ["pavingRate", "ratePerInch"], calc: (rate, perInch) => (perInch > 0 ? rate / perInch : null), unit: "in", decimals: 2, instruction: "Paving rate / rate per inch." },
+    { key: "beginStation", label: "Begin Station", type: "text", instruction: "As written, e.g. 135+56." },
+    { key: "endStation", label: "End Station", type: "text" },
+    { key: "stationsRun", label: "Stations Run", type: "select", options: ["Increasing", "Decreasing"] },
+    { key: "lane", label: "Lane", type: "select", options: ["Inner", "Outer"] },
+    { key: "direction", label: "Direction", type: "text" },
+    { key: "matWidth", label: "Mat Width", type: "input", unit: "ft", decimals: 1, step: "0.1" },
+    { key: "rollingPattern", label: "Rolling Pattern", type: "text" },
+    { key: "rollingPatternSet", label: "Roller operator pattern established", type: "check", optional: true },
   ]
 };
 
@@ -107,6 +123,7 @@ const WorkdayLenses = {
       ] },
       { label: "On the jobsite", icon: "🚧", entries: [
         { label: "Jobsite setup", section: "Jobsite Setup" },
+        { label: "Placements (rate, stations, lane, pattern)", records: "placement", timeKey: "systemCreatedAt" },
         { label: "Cores", ...todaysCores },
         { label: "Weather", section: "Weather" }
       ] },
@@ -130,8 +147,6 @@ const LevelFields = {
   mix: [
     { key: "mixDescription", home: "mix", label: "Mix (as written in the book)", type: "text", instruction: "As you write it on the Red Book's Mix line, e.g. 1/2\" ESAL C/D." },
     { key: "mixDesignNumber", home: "mix", label: "Mix Design Number", type: "text" },
-    { key: "pavingRate", home: "mix", label: "Paving Rate", type: "input", unit: "lb/yd²", decimals: 0, step: "1", rerender: true, instruction: "Ask the screed operator what rate they're setting." },
-    { key: "expectedLift", home: "mix", label: "Expected Lift (set PQI depth to match)", type: "computed", from: ["pavingRate", "ratePerInch"], calc: (rate, perInch) => (perInch > 0 ? rate / perInch : null), unit: "in", decimals: 2 },
     { key: "ratePerInch", home: "mix", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", rerender: true, optional: true, instruction: "Rule of thumb 110." },
     { key: "nominalSize", home: "mix", label: "Nominal Size", type: "select", options: ["3/8\"", "1/2\"", "3/4\"", "1\"", "1 1/2\""], instruction: "Entered into the PQI at setup; also explains texture and thin-lift trouble." },
     { key: "payItem", home: "mix", label: "Pay Item", type: "text" },

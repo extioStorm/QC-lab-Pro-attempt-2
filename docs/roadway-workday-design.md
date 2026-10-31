@@ -148,11 +148,13 @@ The Red Book and Diary need a day picker: choose a Workday Log, and the lens fil
    - Lens entries are grouped: At the plant (morning), On the jobsite, Back at the plant.
    - PQI setup: target reading % (default 88) and offset in MTD units; replaces start/adjusted offset.
 2c. **Done (piece 2 of the job-level change):**
-   - Levels can declare their own `fields` (`DatabaseMap.entities[level].fields`, from `LevelFields` in `asphalt-roadway.js`), shown on the level's page and edited with the same row builder and handler (a field is a step with `home: <level>`). Job: state project number, road, sublot length. Mix: mix as written in the book (one text field), mix design number, pay item, design Gmm. (Nominal size, mix type and rate per inch were removed: nothing used them. Rate per inch comes back with expected thickness.) Plant: haul time.
+   - Levels can declare their own `fields` (`DatabaseMap.entities[level].fields`, from `LevelFields` in `asphalt-roadway.js`), shown on the level's page and edited with the same row builder and handler (a field is a step with `home: <level>`). Job: state project number, road, sublot length. Mix: mix as written in the book (one text field), mix design number, nominal size (entered into the PQI; explains texture and thin-lift trouble), rate per inch (default 110), pay item, design Gmm. Plant: haul time.
    - Step type `multi`: tick any records of a level (`optionsFrom`) under the record's parent. The Plan section's "Mixes Placed Today" replaces "Planned Mix".
    - Lens entry "Mix & job info" (`fieldsOf`): the job, then each mix placed today and its plant, each with filled/total; tapping opens that page. Each value is stored once on its own level.
    - Mixes-placed list has an "add a mix" button that makes the mix and its plant (`alsoCreate`) with the tree's own add actions. Mix "Layer" became "Mix Type" (surface, intermediate, binder, base, SMA, open graded / popcorn, patching, other); nominal size is separate. PQI offset reason removed. PQI setup gained gauge mix preset and gauge depth.
-   - Not yet: expected thickness per mix (paving rate x mix's rate per inch), Gauge Standard Check record, Core # (pre-filled as one more than the highest Core # in that mix; typing over it is fine, the next one follows the highest).
+   - Paving rate is per mix placed today (step type `perPick`: one number per record picked in another step), asked of the screed operator at the jobsite. Each line shows the expected lift (rate / that mix's rate per inch) to set the PQI depth; shown, never stored. Only the mix being cored matters for the PQI.
+   - Later: use nominal size, binder vs surface and paving rate to suggest rolling patterns (vibratory passes).
+   - Not yet: Gauge Standard Check record, Core # (pre-filled as one more than the highest Core # in that mix; typing over it is fine, the next one follows the highest).
 3. Mat Temp, Day Event, core field steps (including core kind, lot and sublot).
 4. Framework item 3 plus the Red Book and Diary lenses.
 5. Break the Mat (needs item 4) and Open Follow-ups.

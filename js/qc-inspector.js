@@ -16,7 +16,7 @@ function commitChange(key, { redraw = true, reopen = false, step } = {}) {
 }
 
 // A value typed, ticked or picked on a step: a number for "input", true/false for "check", a list for "multi",
-// text otherwise. `step` defaults to the step of the test on screen; a level's own field passes its step.
+// { option id: number } for "perPick", text otherwise. `step` defaults to the step of the test on screen; a level's own field passes its step.
 function handleScaleInput(fieldKey, rawValue, step = findStep(fieldKey)) {
   const home = getStepHome(step);
   if (!home) return;
@@ -24,6 +24,7 @@ function handleScaleInput(fieldKey, rawValue, step = findStep(fieldKey)) {
   const text = String(rawValue).trim();
   if (type === "check") home[fieldKey] = Boolean(rawValue);
   else if (type === "multi") home[fieldKey] = rawValue.length ? rawValue : null;
+  else if (type === "perPick") home[fieldKey] = Object.keys(rawValue).length ? rawValue : null;
   else if (text === "") home[fieldKey] = null;
   else home[fieldKey] = type === "input" ? parseFloat(text) : text;
   commitChange(fieldKey, { redraw: Boolean(step && step.rerender), step });

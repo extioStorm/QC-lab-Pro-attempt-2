@@ -50,6 +50,7 @@ function isStepFilled(type, record, ctx, step) {
   const value = valueOf(type, record, ctx, step.key);
   if (step.type === "check") return value === true;
   if (Array.isArray(value)) return value.length > 0;
+  if (value && typeof value === "object") return Object.values(value).some(hasNumber);
   return hasNumber(value) || (typeof value === "string" && value.trim() !== "");
 }
 // The day a lens looks at: the latest record of `window.type` in `scope` (by its start time) and its span,

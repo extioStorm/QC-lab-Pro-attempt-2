@@ -278,7 +278,7 @@ function renderPrereqSection(prereqSteps, record) {
 }
 
 // Steps whose control goes under the label (it needs the width), with the caption word for each.
-const BELOW_LABEL_STEPS = { datetime: "Date & time", choice: "Choose", text: "Text", select: "Pick one", multi: "Pick any" };
+const BELOW_LABEL_STEPS = { datetime: "Date & time", choice: "Choose", text: "Text", select: "Pick one", multi: "Pick any", perPick: "One per pick" };
 
 // One step as a Speed Sheet row: a date/choice/text/pick gets its control under the label, a calculated
 // value is tappable to inspect, a number or a check box goes on the right. `withInstruction` (wizard pages)
@@ -439,6 +439,32 @@ function buildStepControl(step, record) {
     const options = [{ value: "", label: "— Choose —" }].concat((step.options || []).map(option => ({ value: option, label: option })))
       .map(option => ({ ...option, selected: option.value === current }));
     wrap.appendChild(buildSourceView({ options }, value => handleScaleInput(step.key, value, step)));
+  } else if (step.type === "perPick") {
+    // A number for each record picked in the `of` step (e.g. a paving rate per mix placed today), with the
+    // module's `note(option, value)` beside it.
+    const ctx = getActiveContext();
+    const parentLevel = DatabaseMap.tests[Nav.activeTestType].parent;
+    const picked = record[step.of] || [];
+    const values = home[step.key] || {};
+    const options = collectLevelRecords(parentLevel, ctx[parentLevel], step.optionsFrom)
+      .filter(({ record: option }) => picked.includes(option[DatabaseMap.entities[step.optionsFrom].idKey]));
+    if (!options.length) wrap.appendChild(el("div", "src-hint", "Pick today's mixes first."));
+    options.forEach(({ record: option }) => {
+      const id = option[DatabaseMap.entities[step.optionsFrom].idKey];
+      const input = el("input");
+      input.type = "number";
+      input.inputMode = "decimal";
+      input.step = step.step || "any";
+      input.dataset.option = id;
+      input.value = hasNumber(values[id]) ? values[id] : "";
+      input.onchange = () => {
+        const next = {};
+        wrap.querySelectorAll("input[data-option]").forEach(box => { if (box.value !== "") next[box.dataset.option] = parseFloat(box.value); });
+        handleScaleInput(step.key, next, { ...step, rerender: true });
+      };
+      const note = step.note ? step.note(option, values[id]) : "";
+      wrap.appendChild(buildRow({ label: getNodeTitle(step.optionsFrom, option, id), caption: note, control: input, className: "inset" }));
+    });
   } else if (step.type === "multi") {
     // Tick any of the records at level `optionsFrom` under this record's parent (e.g. the job's mixes).
     const ctx = getActiveContext();

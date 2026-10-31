@@ -59,6 +59,7 @@ function createDatabaseRecord(parent, collection, id, record) {
 //   datetime step       -> now, with its "automatic" flag set (and the time it was created, when it keeps one)
 //   fetched step        -> also the bookkeeping fields its source policy stores (storeKeys)
 //   `home` step         -> nothing: that value lives on an ancestor, not on this record
+//   step with autoFill  -> autoFill.value(record, parent), after the defaults (e.g. the next number in a series)
 // `database` on the definition says where the record goes and how its id looks:
 //   { parent, collection, idKey, idPrefix?, idPad?, defaults? }  (defaults = fields every new record starts with)
 function createTestRecord(type, parent, overrides = {}) {
@@ -87,7 +88,15 @@ function createTestRecord(type, parent, overrides = {}) {
     if (resolver) resolver.storeKeys.forEach(key => { record[key] = null; });
   });
   Object.assign(record, database.defaults, overrides);
+  applyAutoFill(type, record, parent);
   return createDatabaseRecord(parent, database.collection, id, record);
+}
+// Steps with `autoFill: { when: [keys], value(record, parent) }` are filled in when the record is made, and again
+// when one of `when` changes (changedKey); otherwise they are ordinary fields the person can type over.
+function applyAutoFill(type, record, parent, changedKey = null) {
+  TestDefinitions[type].sequence.forEach(step => {
+    if (step.autoFill && (changedKey === null || step.autoFill.when.includes(changedKey))) record[step.key] = step.autoFill.value(record, parent);
+  });
 }
 function getIsoTimestamp(date = new Date()) {
   const pad = n => String(n).padStart(2, "0");

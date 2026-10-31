@@ -1,6 +1,7 @@
 // @ts-nocheck
 const DEFAULT_DRYBACK_CORRECTION = 0.005;
 const DEFAULT_HAUL_MINUTES = 30;
+const MTD_PER_GMB = 62.2; // PQI MTD (lb/ft³) is about Gmb x 62.2
 const DEFAULT_RATE_PER_INCH = 110; // lb/yd² per inch compacted; a rule of thumb, a default on each mix design
 
 const T166 = {
@@ -8,6 +9,17 @@ const T166 = {
   gmb:     (dry, volume) => (volume > 0 ? dry / volume : null),
   percent: (gmb, gmm) => ((gmb && gmm > 0) ? roundHalfToEven(gmb / gmm, 5) * 100 : null)
 };
+
+// A new core's Core #: one more than the highest number of the same kind on this plant (1, 2... or QC 1, QC 2...).
+function nextCoreNumber(core, plant) {
+  const isQc = core.coreKind === "QC";
+  const used = Object.values((plant && plant.cores) || {})
+    .filter(other => other !== core && (other.coreKind === "QC") === isQc)
+    .map(other => parseInt(String(other.coreNumber || "").replace(/\D/g, ""), 10))
+    .filter(n => !isNaN(n));
+  const next = (used.length ? Math.max(...used) : 0) + 1;
+  return isQc ? `QC ${next}` : String(next);
+}
 
 const TestDefinitions = {
   // A company mix design (an asset kept beside the projects): entered once, used by every job's mix that picks it.
@@ -200,8 +212,8 @@ const TestDefinitions = {
     id: "core",
     title: "Roadway Core",
     icon: "🔴",
-    database: { parent: "plant", collection: "cores", idKey: "coreId", idPrefix: "CORE-", idPad: 2, defaults: { station: "" } },
-    navigation: { group: true, groupIcon: "🛣️", collectionLabel: "Roadway Cores", addLabel: "Log New Roadway Core", itemLabel: (core, id) => `Core ${id} (${core.station || "No Station"})` },
+    database: { parent: "plant", collection: "cores", idKey: "coreId", idPrefix: "CORE-", idPad: 2, defaults: { coreKind: "State" } },
+    navigation: { group: true, groupIcon: "🛣️", collectionLabel: "Roadway Cores", addLabel: "Log New Roadway Core", itemLabel: (core, id) => `Core ${core.coreNumber || id} (${core.station || "No Station"})` },
     sequence: [
       {
         key: "transitMinutes",
@@ -243,6 +255,13 @@ const TestDefinitions = {
         decimals: 3,
         instruction: "Gmm reference."
       },
+      { key: "coreKind", label: "Core Kind", type: "select", options: ["State", "QC"], section: "Locate & Read", rerender: true, instruction: "State: the inspector gave the location; counts toward one core per sublot. QC: your own check on the mix and the gauge calibration, at a spot you pick." },
+      { key: "coreNumber", label: "Core #", type: "text", section: "Locate & Read", autoFill: { when: ["coreKind"], value: nextCoreNumber }, instruction: "Filled in with the next number for this kind (1, 2... or QC 1, QC 2...); type over it if needed." },
+      { key: "station", label: "Station", type: "text", section: "Locate & Read", instruction: "As given, e.g. 135+56. Measure back or forward from whichever station is nearest (136+00 back 44 ft, or 135+00 forward 56 ft) and mark it with paint." },
+      { key: "offset", label: "Offset", type: "text", section: "Locate & Read", instruction: "As written, from the centerline or an edge, e.g. 6' off C/L or 8' off outer edge. Measure it the same way every time." },
+      { key: "sublotLimits", label: "Station Limits (sublot)", type: "text", section: "Locate & Read", instruction: "The sublot this core is in, e.g. 00+00 to 30+00 (the line under the core # in the book)." },
+      { key: "pqiPercent", label: "PQI Density (5-reading avg)", type: "input", unit: "%", decimals: 1, step: "0.1", section: "Locate & Read", instruction: "Use the five-reading average mode at the exact spot and circle it with the lumber crayon. The core should be within about six inches." },
+      { key: "pqiMtd", label: "PQI MTD (5-reading avg)", type: "input", unit: "", decimals: 1, step: "0.1", section: "Locate & Read" },
       {
         key: "laydownTimestamp",
         label: "Lay Time (placement time)",
@@ -252,8 +271,13 @@ const TestDefinitions = {
         autoHint: "automatic",
         manualHint: "entered",
         rerender: true,
-        instruction: "When the section of mat was laid."
+        section: "Ice & Cut",
+        instruction: "When the section of mat was laid. Then ice the spot (about 10 minutes per inch of thickness), check the mat is about 150°F or cooler before moving the rig on, set up the drill and water, cut, and pry the core out with the removal tool."
       },
+      { key: "thickness", label: "Thickness", type: "input", unit: "in", decimals: 2, step: "0.125", section: "Label, Measure & Hand Off", instruction: "Write the core # on the core with the lumber crayon first, then measure." },
+      { key: "handedTo", label: "Handed To", type: "text", section: "Label, Measure & Hand Off", instruction: "Who took the core and its paperwork, and when if it wasn't right away." },
+      { key: "holeFilled", label: "Hole filled", type: "check", section: "Label, Measure & Hand Off", instruction: "Fill from the paver while asphalt is available; if paving has stopped, bring asphalt the next day. Stays an open follow-up until ticked." },
+      { key: "coreNotes", label: "Notes", type: "text", section: "Label, Measure & Hand Off", instruction: "Observed facts only (e.g. paver sat over this spot 20 min). Never label a core bad or assert a cause." },
       {
         key: "dryWeight",
         label: "Dry Core Mass in Air (A)",
@@ -261,6 +285,7 @@ const TestDefinitions = {
         unit: "g",
         decimals: 1,
         step: "0.1",
+        section: "Lab",
         instruction: "Weigh trimmed, dry core in air."
       },
       {
@@ -270,6 +295,7 @@ const TestDefinitions = {
         unit: "g",
         decimals: 1,
         step: "0.1",
+        section: "Lab",
         instruction: "Immerse core in water bath."
       },
       {
@@ -279,6 +305,7 @@ const TestDefinitions = {
         unit: "g",
         decimals: 1,
         step: "0.1",
+        section: "Lab",
         instruction: "Blot surface with damp towel."
       },
       {
@@ -289,6 +316,7 @@ const TestDefinitions = {
         calc: T166.volume,
         unit: "cm³",
         decimals: 1,
+        section: "Lab",
         instruction: "Core Volume = SSD Mass (B) - Submerged Mass (C)."
       },
       {
@@ -299,6 +327,7 @@ const TestDefinitions = {
         calc: T166.gmb,
         unit: "",
         decimals: 3,
+        section: "Lab",
         instruction: "Core Gmb = Dry Mass (A) / Volume."
       },
       {
@@ -309,8 +338,12 @@ const TestDefinitions = {
         calc: T166.percent,
         unit: "%",
         decimals: 1,
+        section: "Lab",
         instruction: "In-Place Density % = (Core Gmb / Target Rice Gmm) * 100."
-      }
+      },
+      { key: "labMtd", label: "Lab MTD", type: "computed", from: ["coreGmb"], calc: gmb => gmb * MTD_PER_GMB, unit: "", decimals: 1, section: "Lab", instruction: "Core Gmb x 62.2 (the Actual MTD line in the book)." },
+      { key: "pqiMinusLabPercent", label: "PQI minus Lab (%)", type: "computed", from: ["pqiPercent", "matDensityPercent"], calc: (pqi, lab) => pqi - lab, unit: "%", decimals: 1, section: "Lab", instruction: "How far the gauge read from the core. Consistently high or low suggests adjusting the offset." },
+      { key: "pqiMinusLabMtd", label: "PQI minus Lab (MTD)", type: "computed", from: ["pqiMtd", "labMtd"], calc: (pqi, lab) => pqi - lab, unit: "", decimals: 1, section: "Lab" }
     ]
   },
   bowlCalibration: {

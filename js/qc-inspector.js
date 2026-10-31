@@ -24,6 +24,8 @@ function handleScaleInput(fieldKey, rawValue, step = findStep(fieldKey)) {
   if (type === "check") home[fieldKey] = Boolean(rawValue);
   else if (text === "") home[fieldKey] = null;
   else home[fieldKey] = type === "input" ? parseFloat(text) : text;
+  const test = DatabaseMap.tests[Nav.activeTestType];
+  if (test && home === getActiveRecord()) applyAutoFill(Nav.activeTestType, home, getActiveContext()[test.parent], fieldKey);
   commitChange(fieldKey, { redraw: Boolean(step && step.rerender), step });
 }
 

@@ -33,7 +33,7 @@ TestDefinitions.workdayLog = {
     { key: "gaugeStandardChi", label: "Nuclear Gauge Standard CHI", type: "input", unit: "", decimals: 0, step: "any", section: "Open Plant", instruction: "Asphalt content gauge standard check.", optional: true },
     { key: "gaugeStandardCount", label: "Nuclear Gauge Standard Count", type: "input", unit: "", decimals: 0, step: "1", section: "Open Plant", instruction: "Standard number from the check.", optional: true },
 
-    { key: "mixesPlaced", label: "Mixes Placed Today", type: "text", section: "Plan", instruction: "Check with the scale house: the planned mix or mixes, whether the plant is running or on standby (and why), when production or shipping is expected to start, and any plan changes. Plans are expectations, not guarantees. Then go over it with the plant lab technician: re-verify, ask for anything newer, sort out differences, and agree how you'll keep in touch during the day (save their number in your phone). List the mixes laid today as they go in the Red Book, including patching." },
+    { key: "mixesPlanned", label: "Mixes Planned Today", type: "text", section: "Plan", instruction: "Check with the scale house: the planned mix or mixes, whether the plant is running or on standby (and why), when production or shipping is expected to start, and any plan changes. Plans are expectations, not guarantees. Then go over it with the plant lab technician: re-verify, ask for anything newer, sort out differences, and agree how you'll keep in touch during the day (save their number in your phone). List the mixes planned for today as they go in the Red Book, including patching; the PQI setup comes next and depends on it." },
 
     { key: "pqiPresetMix", label: "Gauge Mix Preset", type: "text", section: "PQI Setup", instruction: "The mix preset selected on the gauge, so readings use consistent settings." },
     { key: "pqiMixSize", label: "Gauge Mix Size", type: "select", options: ["3/8\"", "1/2\"", "3/4\"", "1\"", "1 1/2\""], section: "PQI Setup", instruction: "The mix (rock) size keyed into the gauge, for the mix you're coring." },
@@ -98,6 +98,21 @@ TestDefinitions.placement = {
   ]
 };
 
+// A lot on a job's mix (set by tonnage): where it starts and, once the tonnage is reached, where it ends.
+TestDefinitions.lot = {
+  id: "lot",
+  title: "Lot",
+  icon: "📏",
+  database: { parent: "mix", collection: "lots", idKey: "lotId", idPrefix: "LOT-", idPad: 2 },
+  navigation: { group: true, groupIcon: "📏", collectionLabel: "Lots", addLabel: "Start New Lot", itemLabel: (r, id) => `Lot ${r.lotNumber || id}${r.beginStation ? " · " + r.beginStation + " to " + (r.endStation || "...") : ""}` },
+  sequence: [
+    { key: "lotNumber", label: "Lot #", type: "text" },
+    { key: "beginStation", label: "Begin Station", type: "text", instruction: "As written, e.g. 00+00." },
+    { key: "endStation", label: "End Station", type: "text", instruction: "Where the lot's tonnage ran out." },
+    { key: "lotNotes", label: "Notes", type: "text", optional: true }
+  ]
+};
+
 // Company equipment, kept beside the projects (database.parent "top") so it is entered once for every job.
 TestDefinitions.paver = {
   id: "paver",
@@ -159,7 +174,7 @@ const WorkdayLenses = {
   }
 };
 
-// Fields kept on the job, the job's mix and the plant themselves (design facts live on the company mix design) (entered once, shown on their pages and in the
+// Fields kept on the job, the job mix and the plant themselves (design facts live on the company mix design) (entered once, shown on their pages and in the
 // "Mix & job info" entry). A field exists only if it feeds the Red Book, the Diary, the PQI or a calculation,
 // or is a tool the technician asked for (toolbox); anything else is an instruction or nothing.
 const LevelFields = {
@@ -169,7 +184,7 @@ const LevelFields = {
     { key: "sublotLengthFt", home: "project", label: "Sublot Length", type: "input", unit: "ft", decimals: 0, step: "1", optional: true }
   ],
   mix: [
-    { key: "designId", home: "mix", label: "Mix Design", type: "select", optionsFrom: "mixDesign", rerender: true, instruction: "The company mix design this job's mix uses (add designs under Company Assets)." },
+    { key: "designId", home: "mix", label: "Mix Design", type: "select", optionsFrom: "mixDesign", rerender: true, instruction: "The company mix design this job mix uses (add designs under Company Assets)." },
     { key: "payItem", home: "mix", label: "Pay Item", type: "text" }
   ],
   plant: [

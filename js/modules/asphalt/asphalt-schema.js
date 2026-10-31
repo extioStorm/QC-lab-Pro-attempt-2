@@ -5,7 +5,7 @@ const DatabaseMap = {
   storage: { databaseKey: "qc_asphalt_db", navigationKey: "qc_asphalt_nav" },
   entities: {
     project: { label: "Project", idKey: "projectId", navKey: "projectId", titleKey: "projectName", fields: LevelFields.project, icon: "📁", navigationTitle: (r, id) => `${id}: ${r.projectName || "Unnamed Project"}` },
-    mix:     { label: "Mix", idKey: "mixId", navKey: "mixId", titleKey: "mixName", refs: { mixDesign: { key: "designId", type: "mixDesign" } }, fields: LevelFields.mix, icon: "🥣", navigationTitle: (r, id) => r.mixName || id },
+    mix:     { label: "Job Mix", idKey: "mixId", navKey: "mixId", titleKey: "mixName", refs: { mixDesign: { key: "designId", type: "mixDesign" } }, fields: LevelFields.mix, icon: "🥣", navigationTitle: (r, id) => r.mixName || id },
     plant:   { label: "Plant", idKey: "plantId", navKey: "plantId", titleKey: "plantName", fields: LevelFields.plant, icon: "🏭", navigationTitle: (r, id) => r.plantName || id },
     sample:  { label: "Truck Sample", idKey: "sampleId", navKey: "sampleId", titleKey: "timestamp", icon: "🕒", navigationTitle: (r, id) => `Sample @ ${shortStamp(r.timestamp || r.sampleId || id)}` }
   },
@@ -19,9 +19,9 @@ const DatabaseMap = {
       collection: "mixes",
       node: "mix",
       navigation: {
-        addLabel: "Add Mix to This Job",
-        fields: [{ key: "name", prompt: "Enter a name for this mix on this job:", required: true }],
-        requiredMessage: "A mix name is required.",
+        addLabel: "Add Job Mix",
+        fields: [{ key: "name", prompt: "Enter a name for this job mix:", required: true }],
+        requiredMessage: "A job mix name is required.",
         clearNav: ["plantId", "sampleId", "activeTestType", "activeTestId"],
         create: (project, values) => {
           const id = `MIX-${nextNumber(project.mixes)}`;
@@ -92,7 +92,7 @@ const DatabaseMap = {
       { key: "jobId", label: "Job / Contract #:", placeholder: "e.g. JOB-2026-A" },
       { key: "jobName", label: "Project Name / Location:", placeholder: "e.g. Hwy 41 Resurfacing" },
       { key: "designId", label: "Mix Design:", optionsFrom: "mixDesign", newLabel: "➕ New mix design (named below)" },
-      { key: "mixName", label: "Mix Name:", placeholder: "e.g. 1/2\" ESAL C/D" },
+      { key: "mixName", label: "Job Mix Name:", placeholder: "e.g. 1/2\" ESAL C/D" },
       { key: "plantName", label: "Plant Facility Name:", placeholder: "e.g. North Drum Plant" }
     ],
     // Builds project > mix > plant with the same "add" actions the navigation tree uses, and selects what it made.

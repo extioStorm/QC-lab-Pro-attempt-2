@@ -1,7 +1,6 @@
 // @ts-nocheck
 // Roadway workday records. Loaded after asphalt-defs.js (adds to TestDefinitions) and before
 // asphalt-schema.js (which reads TestDefinitions to build the tree).
-const DEFAULT_RATE_PER_INCH = 110;     // lb/yd² per inch compacted; a rule of thumb, kept on the mix
 const DEFAULT_SUBLOT_LENGTH_FT = 3000; // kept on the project
 const DEFAULT_PQI_TARGET_PERCENT = 88; // reading to calibrate to on uncompacted mat (older pavers)
 
@@ -37,6 +36,8 @@ TestDefinitions.workdayLog = {
     { key: "mixesPlaced", label: "Which of this job's mixes were laid today?", type: "multi", optionsFrom: "mix", alsoCreate: ["plant"], section: "Plan", instruction: "Check with the scale house: the planned mix or mixes, whether the plant is running or on standby (and why), when production or shipping is expected to start, and any plan changes. Plans are expectations, not guarantees. Then go over it with the plant lab technician: re-verify, ask for anything newer, sort out differences, and agree how you'll keep in touch during the day (save their number in your phone). Tick every mix laid today, including patching." },
 
     { key: "pqiTargetPercent", label: "Target Reading, Uncompacted Mat", type: "input", unit: "%", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "What the gauge is calibrated to read before rolling. 88% on older pavers; newer screeds may need up to about 91%." },
+    { key: "pqiPresetMix", label: "Gauge Mix Preset", type: "text", section: "PQI Setup", instruction: "The mix preset selected on the gauge, so readings use consistent settings." },
+    { key: "pqiDepth", label: "Gauge Depth", type: "input", unit: "in", decimals: 2, step: "0.25", section: "PQI Setup", instruction: "Depth set on the gauge; it matters relative to the lift thickness." },
     { key: "pqiOffset", label: "Offset", type: "input", unit: "MTD", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "In MTD units, + or -. A -4 offset turns a 145 reading into 141. Found by trial and error." },
     { key: "pqiCalibrated", label: "PQI calibrated for this setup", type: "check", section: "PQI Setup", optional: true },
     { key: "pqiId", label: "PQI ID", type: "text", section: "PQI Setup", optional: true },
@@ -118,7 +119,8 @@ const WorkdayLenses = {
 };
 
 // Fields kept on the job, the mix and the plant themselves (entered once, shown on their pages and in the
-// "Mix & job info" entry). They fill the Red Book header.
+// "Mix & job info" entry). A field exists only if it feeds the Red Book, the Diary, the PQI or a calculation,
+// or is a tool the technician asked for (toolbox); anything else is an instruction or nothing.
 const LevelFields = {
   project: [
     { key: "stateProjectNumber", home: "project", label: "State Project Number", type: "text" },
@@ -126,11 +128,9 @@ const LevelFields = {
     { key: "sublotLengthFt", home: "project", label: "Sublot Length", type: "input", unit: "ft", decimals: 0, step: "1", optional: true }
   ],
   mix: [
+    { key: "mixDescription", home: "mix", label: "Mix (as written in the book)", type: "text", instruction: "As you write it on the Red Book's Mix line, e.g. 1/2\" ESAL C/D." },
     { key: "mixDesignNumber", home: "mix", label: "Mix Design Number", type: "text" },
-    { key: "nominalSize", home: "mix", label: "Nominal Size", type: "select", options: ["3/8\"", "1/2\"", "3/4\"", "1\"", "1 1/2\""] },
-    { key: "layer", home: "mix", label: "Mix Type", type: "select", options: ["Surface", "Intermediate", "Binder", "Base", "SMA", "Open graded / popcorn", "Patching", "Other"] },
     { key: "payItem", home: "mix", label: "Pay Item", type: "text" },
-    { key: "ratePerInch", home: "mix", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", instruction: "Rule of thumb 110; agencies vary." },
     { key: "designGmm", home: "mix", label: "Mix Design Gmm", type: "input", unit: "", decimals: 3, step: "0.001", optional: true }
   ],
   plant: [

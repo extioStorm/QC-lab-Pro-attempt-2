@@ -14,7 +14,7 @@ TestDefinitions.workdayLog = {
   id: "workdayLog",
   title: "Workday Log",
   icon: "📅",
-  database: { parent: "project", collection: "workdayLogs", idKey: "workdayLogId", idPrefix: "DAY-", idPad: 2, defaults: { endedAt: null, expectedStart: null, weatherRecordedAt: null, pqiTargetPercent: DEFAULT_PQI_TARGET_PERCENT } },
+  database: { parent: "project", collection: "workdayLogs", idKey: "workdayLogId", idPrefix: "DAY-", idPad: 2, defaults: { endedAt: null, weatherRecordedAt: null, pqiTargetPercent: DEFAULT_PQI_TARGET_PERCENT } },
   navigation: { group: true, groupIcon: "📅", collectionLabel: "Workday Logs", addLabel: "Start New Workday", itemLabel: (r, id) => `Workday ${shortStamp(r.startedAt)}${r.techName ? " · " + r.techName : ""}` },
   sequence: [
     { key: "techName", label: "Technician", type: "text", instruction: "Who is working today." },
@@ -34,14 +34,8 @@ TestDefinitions.workdayLog = {
     { key: "gaugeStandardChi", label: "Nuclear Gauge Standard CHI", type: "input", unit: "", decimals: 0, step: "any", section: "Open Plant", instruction: "Asphalt content gauge standard check.", optional: true },
     { key: "gaugeStandardCount", label: "Nuclear Gauge Standard Count", type: "input", unit: "", decimals: 0, step: "1", section: "Open Plant", instruction: "Standard number from the check.", optional: true },
 
+    { key: "planGuide", label: "What to find out", type: "info", section: "Plan", optional: true, text: "Check with the scale house: the planned mix or mixes, whether the plant is running or on standby (and why), when production or shipping is expected to start, and any plan changes. Plans are expectations, not guarantees. Then go over it with the plant lab technician: re-verify, ask for anything newer, sort out differences, and agree how you'll keep in touch during the day." },
     { key: "plannedMix", label: "Planned Mix", type: "text", section: "Plan", instruction: "From the scale house." },
-    { key: "plantStatus", label: "Plant Status", type: "select", options: ["Running", "Standby", "Not running"], section: "Plan", optional: true },
-    { key: "plantStatusReason", label: "Status Reason", type: "text", section: "Plan", optional: true },
-    { key: "expectedStart", label: "Expected Start", type: "datetime", section: "Plan", instruction: "When production / shipping is expected to start.", optional: true },
-    { key: "planChanges", label: "Plan Changes", type: "text", section: "Plan", optional: true },
-    { key: "plantLabTech", label: "Plant Lab Technician", type: "text", section: "Plan", optional: true },
-    { key: "verifiedWithPlantLab", label: "Plan verified with plant lab", type: "check", section: "Plan", optional: true },
-    { key: "communicationPlan", label: "How We'll Communicate", type: "text", section: "Plan", optional: true },
 
     { key: "pqiTargetPercent", label: "Target Reading, Uncompacted Mat", type: "input", unit: "%", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "What the gauge is calibrated to read before rolling. 88% on older pavers; newer screeds may need up to about 91%." },
     { key: "pqiOffset", label: "Offset", type: "input", unit: "MTD", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "In MTD units, + or -. A -4 offset turns a 145 reading into 141. Found by trial and error." },

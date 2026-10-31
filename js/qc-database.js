@@ -59,6 +59,7 @@ function createDatabaseRecord(parent, collection, id, record) {
 //   datetime step       -> now, with its "automatic" flag set (and the time it was created, when it keeps one)
 //   fetched step        -> also the bookkeeping fields its source policy stores (storeKeys)
 //   `home` step         -> nothing: that value lives on an ancestor, not on this record
+//   info step           -> nothing: it is guidance to read (its `text`), not a value
 // `database` on the definition says where the record goes and how its id looks:
 //   { parent, collection, idKey, idPrefix?, idPad?, defaults? }  (defaults = fields every new record starts with)
 function createTestRecord(type, parent, overrides = {}) {
@@ -71,7 +72,7 @@ function createTestRecord(type, parent, overrides = {}) {
     : String(number);
   const record = { [database.idKey]: id };
   definition.sequence.forEach(step => {
-    if (step.home) return;
+    if (step.home || step.type === "info") return;
     if (step.type === "computed") {
       record[step.key] = createOverridable();
     } else if (step.type === "choice") {

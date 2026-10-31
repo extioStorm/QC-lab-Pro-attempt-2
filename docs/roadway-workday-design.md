@@ -143,6 +143,7 @@ The Red Book and Diary need a day picker: choose a Workday Log, and the lens fil
 2b. **Done (after review with the technician):**
    - Steps marked `optional` (checklists, extra info) are a toolbox: each section has its own folded "🧰 <section>: checklist & extras" box at the top of that section, in workday order, then its important steps (affect a test, or go in the Red Book / Diary) open. Toolboxes never open by themselves and nothing in them is required: lens progress counts only important steps, and a checklist-only section shows 🧰 with no count.
    - Step Wizard on a test with sections walks one section (a chunk of tasks) per page; Speed Sheet still shows the whole record. Lens entries open the Workday Log in the wizard at their section.
+   - Step type `info`: guidance to read (`text`), nothing stored or counted. Things the technician should know or do but not record are guidance, not checkboxes or inputs (like "dry the core"). The Plan section's plant status / reason / expected start / plan changes / lab tech / communication fields became one "What to find out" note.
    - Lens entries are grouped: At the plant (morning), On the jobsite, Back at the plant.
    - PQI setup: target reading % (default 88) and offset in MTD units; replaces start/adjusted offset.
 3. Mat Temp, Day Event, core field steps (including core kind, lot and sublot).

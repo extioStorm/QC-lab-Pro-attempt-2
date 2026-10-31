@@ -283,6 +283,7 @@ const BELOW_LABEL_STEPS = { datetime: "Date & time", choice: "Choose", text: "Te
 // value is tappable to inspect, a number or a check box goes on the right.
 function buildStepRow(step, record, className = "") {
   const base = { label: step.label, stepKey: step.key, className };
+  if (step.type === "info") return buildRow({ ...base, below: el("div", "instruction", step.text) });
   if (BELOW_LABEL_STEPS[step.type]) {
     return buildRow({ ...base, caption: `${step.key} • ${BELOW_LABEL_STEPS[step.type]}`, below: buildStepControl(step, record) });
   }

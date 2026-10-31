@@ -364,7 +364,7 @@ function buildLensEntryRow(entry, title, lens, scope, win, context, ctx) {
   if (entry.section) {
     const type = lens.window.type;
     // Only the steps that matter count; optional ones (the toolbox) never make a section unfinished.
-    const steps = TestDefinitions[type].sequence.filter(step => step.section === entry.section && step.type !== "computed" && !step.optional);
+    const steps = TestDefinitions[type].sequence.filter(step => step.section === entry.section && !["computed", "info"].includes(step.type) && !step.optional);
     const filled = steps.filter(step => isStepFilled(type, win.record, ctx, step)).length;
     const warning = entry.warn ? recordsInWindow(lens.parent, scope, entry.warn, win).notDone.length : 0;
     return createTreeRow({

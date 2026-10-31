@@ -366,7 +366,7 @@ function buildLensEntryRow(entry, title, lens, scope, win, context, ctx) {
     // Only the steps that matter count; optional ones (the toolbox) never make a section unfinished.
     const steps = TestDefinitions[type].sequence.filter(step => step.section === entry.section && step.type !== "computed" && !step.optional);
     const filled = steps.filter(step => isStepFilled(type, win.record, ctx, step)).length;
-    const warning = entry.warn ? recordsInWindow(scope, entry.warn, win).notDone.length : 0;
+    const warning = entry.warn ? recordsInWindow(lens.parent, scope, entry.warn, win).notDone.length : 0;
     return createTreeRow({
       icon: steps.length ? mark(filled === steps.length) : "🧰",
       title: `${title}${steps.length ? ` · ${filled}/${steps.length}` : ""}${warning ? ` · ⚠ ${entry.warn.warnLabel}: ${warning}` : ""}`,
@@ -377,22 +377,32 @@ function buildLensEntryRow(entry, title, lens, scope, win, context, ctx) {
       })
     });
   }
-  const { records, notDone } = recordsInWindow(scope, entry, win);
-  const idKey = DatabaseMap.tests[entry.records].idKey;
+  const type = entry.records, test = DatabaseMap.tests[type];
+  const { records, notDone } = recordsInWindow(lens.parent, scope, entry, win);
+  // The Nav ids that open a record found under the lens's scope (it may sit under any mix / plant).
+  const contextOf = recordCtx => Object.assign(contextIds(recordCtx, null), selectionTarget(test.parent, recordCtx[test.parent][DatabaseMap.entities[test.parent].idKey]));
   if (entry.doneKey) {
     return createTreeRow({
       icon: mark(records.length && !notDone.length),
       title: `${title} · ${records.length - notDone.length} of ${records.length} ${entry.doneLabel}`,
       isLeaf: true,
-      onSelect: () => { if (notDone.length) openTestRecord(entry.records, notDone[0][idKey], context); }
+      onSelect: () => { if (notDone.length) openTestRecord(type, notDone[0].record[test.idKey], contextOf(notDone[0].ctx)); }
     });
   }
   return createTreeRow({
-    icon: TestDefinitions[entry.records].icon || "📄",
+    icon: TestDefinitions[type].icon || "📄",
     title: `${title} · ${records.length}`,
     getChildren: rows => {
-      records.forEach(record => rows.appendChild(buildTestRecordRow(entry.records, record, context, true)));
-      rows.appendChild(buildTestAddRow(entry.records, scope, context));
+      records.forEach(found => rows.appendChild(buildTestRecordRow(type, found.record, contextOf(found.ctx), true)));
+      // One add row per place the record can go (e.g. each mix's plant), named by the levels in between.
+      const parents = collectLevelRecords(lens.parent, scope, test.parent);
+      const levels = Object.keys(DatabaseMap.entities);
+      parents.forEach(parent => {
+        const where = levels.slice(levels.indexOf(lens.parent) + 1, levels.indexOf(test.parent) + 1)
+          .map(level => getNodeTitle(level, parent.ctx[level], parent.ctx[level][DatabaseMap.entities[level].idKey])).join(" / ");
+        const label = `${(TestDefinitions[type].navigation || {}).addLabel || "Add"}${parents.length > 1 ? ` · ${where}` : ""}`;
+        rows.appendChild(buildTestAddRow(type, parent.record, contextOf(parent.ctx), label));
+      });
     }
   });
 }

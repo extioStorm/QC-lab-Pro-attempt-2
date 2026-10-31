@@ -64,13 +64,22 @@ function currentWindow(scope, window) {
   const end = parseLocalTime(latest.record[window.endKey]);
   return { record: latest.record, start: latest.start, end: end === null ? Infinity : end };
 }
-// The records of a test in `scope` whose `timeKey` falls inside a window, and those without a `doneKey` value yet.
-function recordsInWindow(scope, { records: type, timeKey, doneKey }, win) {
-  const records = Object.values(scope[DatabaseMap.tests[type].collection] || {}).filter(record => {
+// Every record at `target` level under `obj` (a record at `level`), each with the context it sits in.
+function collectLevelRecords(level, obj, target, ctx = {}) {
+  const here = Object.assign({}, ctx, { [level]: obj });
+  if (level === target) return [{ record: obj, ctx: here }];
+  return ((DatabaseMap.tree[level] || {}).holds || []).filter(hold => hold.node)
+    .flatMap(hold => Object.values(obj[hold.collection] || {}).flatMap(child => collectLevelRecords(hold.node, child, target, here)));
+}
+// The records of a test anywhere under `scope` (a record at `level`) whose `timeKey` falls inside a window, each
+// with its context ({ record, ctx }), and those of them without a `doneKey` value yet.
+function recordsInWindow(level, scope, { records: type, timeKey, doneKey }, win) {
+  const records = [];
+  walkRecords(level, scope, {}, (testType, record, ctx) => {
     const time = parseLocalTime(record[timeKey]);
-    return time !== null && time >= win.start && time <= win.end;
+    if (testType === type && time !== null && time >= win.start && time <= win.end) records.push({ record, ctx });
   });
-  const notDone = doneKey ? records.filter(record => !hasNumber(resolve(record[doneKey]))) : [];
+  const notDone = doneKey ? records.filter(found => !hasNumber(resolve(found.record[doneKey]))) : [];
   return { records, notDone };
 }
 function computeStep(type, step, record, ctx) {

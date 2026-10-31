@@ -14,7 +14,7 @@ TestDefinitions.workdayLog = {
   id: "workdayLog",
   title: "Workday Log",
   icon: "📅",
-  database: { parent: "plant", collection: "workdayLogs", idKey: "workdayLogId", idPrefix: "DAY-", idPad: 2, defaults: { endedAt: null, expectedStart: null, weatherRecordedAt: null, pqiTargetPercent: DEFAULT_PQI_TARGET_PERCENT } },
+  database: { parent: "project", collection: "workdayLogs", idKey: "workdayLogId", idPrefix: "DAY-", idPad: 2, defaults: { endedAt: null, expectedStart: null, weatherRecordedAt: null, pqiTargetPercent: DEFAULT_PQI_TARGET_PERCENT } },
   navigation: { group: true, groupIcon: "📅", collectionLabel: "Workday Logs", addLabel: "Start New Workday", itemLabel: (r, id) => `Workday ${shortStamp(r.startedAt)}${r.techName ? " · " + r.techName : ""}` },
   sequence: [
     { key: "techName", label: "Technician", type: "text", instruction: "Who is working today." },
@@ -35,8 +35,8 @@ TestDefinitions.workdayLog = {
     { key: "gaugeStandardCount", label: "Nuclear Gauge Standard Count", type: "input", unit: "", decimals: 0, step: "1", section: "Open Plant", instruction: "Standard number from the check.", optional: true },
 
     { key: "plannedMix", label: "Planned Mix", type: "text", section: "Plan", instruction: "From the scale house." },
-    { key: "plantStatus", label: "Plant Status", type: "select", options: ["Running", "Standby", "Not running"], section: "Plan" },
-    { key: "plantStatusReason", label: "Status Reason", type: "text", section: "Plan" },
+    { key: "plantStatus", label: "Plant Status", type: "select", options: ["Running", "Standby", "Not running"], section: "Plan", optional: true },
+    { key: "plantStatusReason", label: "Status Reason", type: "text", section: "Plan", optional: true },
     { key: "expectedStart", label: "Expected Start", type: "datetime", section: "Plan", instruction: "When production / shipping is expected to start.", optional: true },
     { key: "planChanges", label: "Plan Changes", type: "text", section: "Plan", optional: true },
     { key: "plantLabTech", label: "Plant Lab Technician", type: "text", section: "Plan", optional: true },
@@ -65,15 +65,12 @@ TestDefinitions.workdayLog = {
 
     { key: "jobsiteAddress", label: "Address / GPS", type: "text", section: "Jobsite Setup", optional: true },
     { key: "road", label: "Road", type: "text", section: "Jobsite Setup" },
-    { key: "transitMinutes", home: "plant", label: "Haul Time, Plant to Job", type: "input", unit: "min", decimals: 0, step: "1", section: "Jobsite Setup", instruction: "Set once for the job. Every core on this plant uses it to find its Rice test." },
     { key: "beginStation", label: "Begin Station", type: "text", section: "Jobsite Setup", instruction: "As written, e.g. 135+56." },
     { key: "stationsRun", label: "Stations Run", type: "select", options: ["Increasing", "Decreasing"], section: "Jobsite Setup" },
     { key: "lane", label: "Lane", type: "select", options: ["Inner", "Outer"], section: "Jobsite Setup" },
     { key: "direction", label: "Direction", type: "text", section: "Jobsite Setup" },
     { key: "matWidth", label: "Mat Width", type: "input", unit: "ft", decimals: 1, step: "0.1", section: "Jobsite Setup" },
     { key: "pavingRate", label: "Paving Rate", type: "input", unit: "lb/yd²", decimals: 0, step: "1", section: "Jobsite Setup" },
-    { key: "ratePerInch", home: "mix", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", section: "Jobsite Setup", instruction: "Kept on the mix. Rule of thumb 110; agencies vary." },
-    { key: "expectedThickness", label: "Expected Thickness", type: "computed", from: ["pavingRate", "ratePerInch"], calc: (rate, perInch) => (perInch > 0 ? rate / perInch : null), unit: "in", decimals: 2, section: "Jobsite Setup", instruction: "Paving rate / rate per inch." },
     { key: "rollingPattern", label: "Rolling Pattern", type: "text", section: "Jobsite Setup" },
     { key: "rollingPatternSet", label: "Roller operator pattern established", type: "check", section: "Jobsite Setup", optional: true },
     { key: "inspectorName", label: "Inspector Name", type: "text", section: "Jobsite Setup", optional: true },
@@ -94,7 +91,8 @@ TestDefinitions.workdayLog = {
   ]
 };
 
-// The roadway technician's workday, in order and in groups. Drawn above the tree for the selected plant (renderLensBlock).
+// The roadway technician's workday, in order and in groups. Drawn above the tree for the selected job (renderLensBlock).
+// A day covers every mix on the job: records entries gather the day's records from all its mixes and plants.
 //   section entry  a section of the day's Workday Log (progress = filled / total)
 //   records entry  the day's records of a test, with its add action; with doneKey, how many are done
 const todaysCores = { records: "core", timeKey: "systemCreatedAt" };
@@ -104,7 +102,7 @@ const WorkdayLenses = {
     id: "roadway",
     label: "Roadway Workday",
     icon: "🛣️",
-    parent: "plant",
+    parent: "project",
     window: { type: "workdayLog", startKey: "startedAt", endKey: "endedAt" },
     startLabel: "Start Today's Workday",
     groups: [

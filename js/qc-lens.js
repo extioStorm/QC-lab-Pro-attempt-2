@@ -144,11 +144,14 @@ function buildLensNav(lens, step) {
   return row;
 }
 // When the screen shows the section a lens step points at, its heading and Back / Next (else null).
+// However the day's record was opened (the lens, Start Workday, the tree), its sections walk the lens.
 function lensSectionPage(sectionName) {
   const state = lensState();
-  const at = state && Nav.lensStep && !Nav.lensStep.list && lensEntryAt(state.lens, Nav.lensStep);
-  if (!at || at.entry.section !== sectionName || Nav.activeTestType !== state.lens.window.type) return null;
-  return { title: lensHeading(state.lens, Nav.lensStep), nav: buildLensNav(state.lens, Nav.lensStep) };
+  if (!state || !state.win || Nav.activeTestType !== state.lens.window.type || getActiveRecord() !== state.win.record) return null;
+  let step = null;
+  state.lens.groups.forEach((group, g) => group.entries.forEach((entry, e) => { if (!step && entry.section === sectionName) step = { group: g, entry: e }; }));
+  if (!step) return null;
+  return { title: lensHeading(state.lens, step), nav: buildLensNav(state.lens, step) };
 }
 // On a record or page opened from a lens list page: a button back to that list.
 function buildLensReturn() {

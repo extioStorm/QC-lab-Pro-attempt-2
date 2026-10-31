@@ -455,6 +455,28 @@ function buildStepControl(step, record) {
       line.append(box, el("span", "", getNodeTitle(step.optionsFrom, option, id)));
       wrap.appendChild(line);
     });
+    // The tree's own "add" actions, so a missing option can be made right here: the option's level, then each
+    // level in `alsoCreate` under it (e.g. a mix and its plant), asking for their names as the tree does.
+    const levels = [step.optionsFrom].concat(step.alsoCreate || []);
+    const actionFor = (parent, level) => ((DatabaseMap.tree[parent].holds.find(h => h.node === level) || {}).navigation);
+    const first = actionFor(parentLevel, step.optionsFrom);
+    if (first && first.create) {
+      const add = el("button", "btn-secondary btn-small", `➕ ${first.addLabel}`);
+      add.onclick = () => {
+        let parent = ctx[parentLevel], parentName = parentLevel;
+        for (const level of levels) {
+          const action = actionFor(parentName, level);
+          const values = action && collectNavigationValues(action);
+          if (!values) break;
+          parent = action.create(parent, values);
+          if (!parent) break;
+          parentName = level;
+        }
+        saveToStorage();
+        renderScreen();
+      };
+      wrap.appendChild(add);
+    }
   }
   return wrap;
 }

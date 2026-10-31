@@ -34,11 +34,10 @@ TestDefinitions.workdayLog = {
     { key: "gaugeStandardChi", label: "Nuclear Gauge Standard CHI", type: "input", unit: "", decimals: 0, step: "any", section: "Open Plant", instruction: "Asphalt content gauge standard check.", optional: true },
     { key: "gaugeStandardCount", label: "Nuclear Gauge Standard Count", type: "input", unit: "", decimals: 0, step: "1", section: "Open Plant", instruction: "Standard number from the check.", optional: true },
 
-    { key: "mixesPlaced", label: "Mixes Placed Today", type: "multi", optionsFrom: "mix", section: "Plan", instruction: "Check with the scale house: the planned mix or mixes, whether the plant is running or on standby (and why), when production or shipping is expected to start, and any plan changes. Plans are expectations, not guarantees. Then go over it with the plant lab technician: re-verify, ask for anything newer, sort out differences, and agree how you'll keep in touch during the day. Tick every mix laid today, including patching." },
+    { key: "mixesPlaced", label: "Which of this job's mixes were laid today?", type: "multi", optionsFrom: "mix", alsoCreate: ["plant"], section: "Plan", instruction: "Check with the scale house: the planned mix or mixes, whether the plant is running or on standby (and why), when production or shipping is expected to start, and any plan changes. Plans are expectations, not guarantees. Then go over it with the plant lab technician: re-verify, ask for anything newer, sort out differences, and agree how you'll keep in touch during the day (save their number in your phone). Tick every mix laid today, including patching." },
 
     { key: "pqiTargetPercent", label: "Target Reading, Uncompacted Mat", type: "input", unit: "%", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "What the gauge is calibrated to read before rolling. 88% on older pavers; newer screeds may need up to about 91%." },
     { key: "pqiOffset", label: "Offset", type: "input", unit: "MTD", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "In MTD units, + or -. A -4 offset turns a 145 reading into 141. Found by trial and error." },
-    { key: "pqiOffsetReason", label: "Reason for Offset", type: "text", section: "PQI Setup", optional: true },
     { key: "pqiCalibrated", label: "PQI calibrated for this setup", type: "check", section: "PQI Setup", optional: true },
     { key: "pqiId", label: "PQI ID", type: "text", section: "PQI Setup", optional: true },
     { key: "paverScreed", label: "Paver / Screed", type: "text", section: "PQI Setup", optional: true },
@@ -129,7 +128,7 @@ const LevelFields = {
   mix: [
     { key: "mixDesignNumber", home: "mix", label: "Mix Design Number", type: "text" },
     { key: "nominalSize", home: "mix", label: "Nominal Size", type: "select", options: ["3/8\"", "1/2\"", "3/4\"", "1\"", "1 1/2\""] },
-    { key: "layer", home: "mix", label: "Layer", type: "select", options: ["Surface", "Intermediate", "Binder", "Base", "Patching"] },
+    { key: "layer", home: "mix", label: "Mix Type", type: "select", options: ["Surface", "Intermediate", "Binder", "Base", "SMA", "Open graded / popcorn", "Patching", "Other"] },
     { key: "payItem", home: "mix", label: "Pay Item", type: "text" },
     { key: "ratePerInch", home: "mix", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", instruction: "Rule of thumb 110; agencies vary." },
     { key: "designGmm", home: "mix", label: "Mix Design Gmm", type: "input", unit: "", decimals: 3, step: "0.001", optional: true }

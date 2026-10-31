@@ -150,6 +150,7 @@ The Red Book and Diary need a day picker: choose a Workday Log, and the lens fil
    - Levels can declare their own `fields` (`DatabaseMap.entities[level].fields`, from `LevelFields` in `asphalt-roadway.js`), shown on the level's page and edited with the same row builder and handler (a field is a step with `home: <level>`). Job: state project number, road, sublot length. Mix: mix design number, nominal size, layer, pay item, rate per inch, design Gmm. Plant: haul time.
    - Step type `multi`: tick any records of a level (`optionsFrom`) under the record's parent. The Plan section's "Mixes Placed Today" replaces "Planned Mix".
    - Lens entry "Mix & job info" (`fieldsOf`): the job, then each mix placed today and its plant, each with filled/total; tapping opens that page. Each value is stored once on its own level.
+   - Mixes-placed list has an "add a mix" button that makes the mix and its plant (`alsoCreate`) with the tree's own add actions. Mix "Layer" became "Mix Type" (surface, intermediate, binder, base, SMA, open graded / popcorn, patching, other); nominal size is separate. PQI offset reason removed.
    - Not yet: expected thickness per mix (paving rate x mix's rate per inch), Gauge Standard Check record, Core # (pre-filled as one more than the highest Core # in that mix; typing over it is fine, the next one follows the highest).
 3. Mat Temp, Day Event, core field steps (including core kind, lot and sublot).
 4. Framework item 3 plus the Red Book and Diary lenses.

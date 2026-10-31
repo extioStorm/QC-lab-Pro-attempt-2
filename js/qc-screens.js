@@ -107,6 +107,7 @@ function renderLanding(container) {
   const id = record[def.idKey], title = getNodeTitle(level, record, id);
   setContextBar(`${getNodeIcon(level)} ${title}`);
   const card = buildCard(`${getNodeIcon(level)} ${title}`, `${def.label || level}. Pick something in the tree, or use the actions below.`);
+  (def.fields || []).forEach(field => card.appendChild(buildStepRow(field, record)));
   (DatabaseMap.tree[level].holds || []).forEach(h => {
     const collection = h.collection || DatabaseMap.tests[h.test].collection;
     const label = h.node
@@ -277,7 +278,7 @@ function renderPrereqSection(prereqSteps, record) {
 }
 
 // Steps whose control goes under the label (it needs the width), with the caption word for each.
-const BELOW_LABEL_STEPS = { datetime: "Date & time", choice: "Choose", text: "Text", select: "Pick one" };
+const BELOW_LABEL_STEPS = { datetime: "Date & time", choice: "Choose", text: "Text", select: "Pick one", multi: "Pick any" };
 
 // One step as a Speed Sheet row: a date/choice/text/pick gets its control under the label, a calculated
 // value is tappable to inspect, a number or a check box goes on the right. `withInstruction` (wizard pages)
@@ -409,7 +410,7 @@ function buildStepControl(step, record) {
     input.inputMode = "decimal";
     input.step = step.step || "any";
     input.value = hasNumber(home[step.key]) ? home[step.key] : "";
-    input.onchange = () => handleScaleInput(step.key, input.value);
+    input.onchange = () => handleScaleInput(step.key, input.value, step);
     wrap.appendChild(input);
   } else if (step.type === "datetime") {
     const input = el("input");
@@ -425,19 +426,35 @@ function buildStepControl(step, record) {
     const input = el("input");
     input.type = "text";
     input.value = home[step.key] ?? "";
-    input.onchange = () => handleScaleInput(step.key, input.value);
+    input.onchange = () => handleScaleInput(step.key, input.value, step);
     wrap.appendChild(input);
   } else if (step.type === "check") {
     const input = el("input");
     input.type = "checkbox";
     input.checked = Boolean(home[step.key]);
-    input.onchange = () => handleScaleInput(step.key, input.checked);
+    input.onchange = () => handleScaleInput(step.key, input.checked, step);
     wrap.appendChild(input);
   } else if (step.type === "select") {
     const current = home[step.key] ?? "";
     const options = [{ value: "", label: "— Choose —" }].concat((step.options || []).map(option => ({ value: option, label: option })))
       .map(option => ({ ...option, selected: option.value === current }));
-    wrap.appendChild(buildSourceView({ options }, value => handleScaleInput(step.key, value)));
+    wrap.appendChild(buildSourceView({ options }, value => handleScaleInput(step.key, value, step)));
+  } else if (step.type === "multi") {
+    // Tick any of the records at level `optionsFrom` under this record's parent (e.g. the job's mixes).
+    const ctx = getActiveContext();
+    const parentLevel = DatabaseMap.tests[Nav.activeTestType].parent;
+    const picked = home[step.key] || [];
+    collectLevelRecords(parentLevel, ctx[parentLevel], step.optionsFrom).forEach(({ record: option }) => {
+      const id = option[DatabaseMap.entities[step.optionsFrom].idKey];
+      const line = el("label", "multi-option");
+      const box = el("input");
+      box.type = "checkbox";
+      box.value = id;
+      box.checked = picked.includes(id);
+      box.onchange = () => handleScaleInput(step.key, [...wrap.querySelectorAll("input:checked")].map(input => input.value), step);
+      line.append(box, el("span", "", getNodeTitle(step.optionsFrom, option, id)));
+      wrap.appendChild(line);
+    });
   }
   return wrap;
 }

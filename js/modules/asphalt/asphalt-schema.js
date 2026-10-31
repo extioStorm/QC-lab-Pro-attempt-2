@@ -4,9 +4,9 @@ const DatabaseMap = {
   rootEntity: "project",
   storage: { databaseKey: "qc_asphalt_db", navigationKey: "qc_asphalt_nav" },
   entities: {
-    project: { label: "Project", idKey: "projectId", navKey: "projectId", titleKey: "projectName", icon: "📁", navigationTitle: (r, id) => `${id}: ${r.projectName || "Unnamed Project"}` },
-    mix:     { label: "Mix Design", idKey: "mixId", navKey: "mixId", titleKey: "mixName", icon: "🥣", navigationTitle: (r, id) => r.mixName || id },
-    plant:   { label: "Plant", idKey: "plantId", navKey: "plantId", titleKey: "plantName", icon: "🏭", navigationTitle: (r, id) => r.plantName || id },
+    project: { label: "Project", idKey: "projectId", navKey: "projectId", titleKey: "projectName", fields: LevelFields.project, icon: "📁", navigationTitle: (r, id) => `${id}: ${r.projectName || "Unnamed Project"}` },
+    mix:     { label: "Mix Design", idKey: "mixId", navKey: "mixId", titleKey: "mixName", fields: LevelFields.mix, icon: "🥣", navigationTitle: (r, id) => r.mixName || id },
+    plant:   { label: "Plant", idKey: "plantId", navKey: "plantId", titleKey: "plantName", fields: LevelFields.plant, icon: "🏭", navigationTitle: (r, id) => r.plantName || id },
     sample:  { label: "Truck Sample", idKey: "sampleId", navKey: "sampleId", titleKey: "timestamp", icon: "🕒", navigationTitle: (r, id) => `Sample @ ${shortStamp(r.timestamp || r.sampleId || id)}` }
   },
   // Where each test's records live (from its definition) and how a new one is made (createTestRecord).

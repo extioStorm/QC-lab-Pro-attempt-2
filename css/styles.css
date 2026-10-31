@@ -519,3 +519,4 @@ details[open] .prereq-arrow {
 .trace-final { font-weight: 700; text-align: center; padding: 0.45rem; }
 .lens-root:not(:empty) { border-bottom: 1px solid var(--panel-border); margin-bottom: 0.5rem; padding-bottom: 0.5rem; }
 .lens-root .tree-title { white-space: normal; }
+.multi-option { display: flex; align-items: center; gap: 0.6rem; padding: 0.35rem 0; color: var(--text); font-weight: 600; }

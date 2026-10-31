@@ -361,6 +361,7 @@ function renderLensBlock(container) {
 // something (done/total; opens the first not done), or the window's records with the add action.
 function buildLensEntryRow(entry, title, lens, scope, win, context, ctx) {
   const mark = done => (done ? "✅" : "▫️");
+  if (entry.fieldsOf) return buildLensFieldsRow(entry, title, lens, scope, win, mark);
   if (entry.section) {
     const type = lens.window.type;
     // Only the steps that matter count; optional ones (the toolbox) never make a section unfinished.
@@ -404,6 +405,33 @@ function buildLensEntryRow(entry, title, lens, scope, win, context, ctx) {
         rows.appendChild(buildTestAddRow(type, parent.record, contextOf(parent.ctx), label));
       });
     }
+  });
+}
+// A lens entry for the levels' own fields (DatabaseMap.entities[level].fields), e.g. job info, then each mix
+// placed today and its plant: one row per record (filled/total; tap opens its page). With `placedKey`, only
+// records under a `placedLevel` record picked on the day's window record are listed.
+function buildLensFieldsRow(entry, title, lens, scope, win, mark) {
+  const placed = entry.placedKey ? (win.record[entry.placedKey] || []) : null;
+  const rows = entry.fieldsOf.flatMap(level => collectLevelRecords(lens.parent, scope, level)
+    .filter(found => !placed || level === lens.parent || placed.includes(found.ctx[entry.placedLevel][DatabaseMap.entities[entry.placedLevel].idKey]))
+    .map(found => {
+      const fields = (DatabaseMap.entities[level].fields || []).filter(field => !field.optional);
+      const filled = fields.filter(field => isStepFilled(null, found.record, found.ctx, field)).length;
+      return { level, found, filled, total: fields.length };
+    }));
+  const allFilled = rows.every(row => row.filled === row.total);
+  return createTreeRow({
+    icon: mark(allFilled && (!placed || placed.length)),
+    title: `${title}${placed && !placed.length ? " · pick today's mixes in Plan" : ""}`,
+    getChildren: list => rows.forEach(({ level, found, filled, total }) => {
+      const id = found.record[DatabaseMap.entities[level].idKey];
+      list.appendChild(createTreeRow({
+        icon: getNodeIcon(level),
+        title: `${getNodeTitle(level, found.record, id)} · ${filled}/${total}`,
+        isLeaf: true,
+        onSelect: () => navigateTo(Object.assign(contextIds(found.ctx, null), selectionTarget(level, id), NO_ACTIVE_TEST))
+      }));
+    })
   });
 }
 function renderRecursiveNode(levelType, obj, id, container, parentContext = {}) {

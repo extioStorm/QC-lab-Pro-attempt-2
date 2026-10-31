@@ -34,7 +34,7 @@ TestDefinitions.workdayLog = {
     { key: "gaugeStandardChi", label: "Nuclear Gauge Standard CHI", type: "input", unit: "", decimals: 0, step: "any", section: "Open Plant", instruction: "Asphalt content gauge standard check.", optional: true },
     { key: "gaugeStandardCount", label: "Nuclear Gauge Standard Count", type: "input", unit: "", decimals: 0, step: "1", section: "Open Plant", instruction: "Standard number from the check.", optional: true },
 
-    { key: "plannedMix", label: "Planned Mix", type: "text", section: "Plan", instruction: "Check with the scale house: the planned mix or mixes, whether the plant is running or on standby (and why), when production or shipping is expected to start, and any plan changes. Plans are expectations, not guarantees. Then go over it with the plant lab technician: re-verify, ask for anything newer, sort out differences, and agree how you'll keep in touch during the day." },
+    { key: "mixesPlaced", label: "Mixes Placed Today", type: "multi", optionsFrom: "mix", section: "Plan", instruction: "Check with the scale house: the planned mix or mixes, whether the plant is running or on standby (and why), when production or shipping is expected to start, and any plan changes. Plans are expectations, not guarantees. Then go over it with the plant lab technician: re-verify, ask for anything newer, sort out differences, and agree how you'll keep in touch during the day. Tick every mix laid today, including patching." },
 
     { key: "pqiTargetPercent", label: "Target Reading, Uncompacted Mat", type: "input", unit: "%", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "What the gauge is calibrated to read before rolling. 88% on older pavers; newer screeds may need up to about 91%." },
     { key: "pqiOffset", label: "Offset", type: "input", unit: "MTD", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "In MTD units, + or -. A -4 offset turns a 145 reading into 141. Found by trial and error." },
@@ -57,7 +57,6 @@ TestDefinitions.workdayLog = {
     ]),
 
     { key: "jobsiteAddress", label: "Address / GPS", type: "text", section: "Jobsite Setup", optional: true },
-    { key: "road", label: "Road", type: "text", section: "Jobsite Setup" },
     { key: "beginStation", label: "Begin Station", type: "text", section: "Jobsite Setup", instruction: "As written, e.g. 135+56." },
     { key: "stationsRun", label: "Stations Run", type: "select", options: ["Increasing", "Decreasing"], section: "Jobsite Setup" },
     { key: "lane", label: "Lane", type: "select", options: ["Inner", "Outer"], section: "Jobsite Setup" },
@@ -68,7 +67,6 @@ TestDefinitions.workdayLog = {
     { key: "rollingPatternSet", label: "Roller operator pattern established", type: "check", section: "Jobsite Setup", optional: true },
     { key: "inspectorName", label: "Inspector Name", type: "text", section: "Jobsite Setup", optional: true },
     { key: "inspectorPhone", label: "Inspector Phone", type: "text", section: "Jobsite Setup", optional: true },
-    { key: "sublotLengthFt", home: "project", label: "Sublot Length", type: "input", unit: "ft", decimals: 0, step: "1", section: "Jobsite Setup", instruction: "Kept on the project.", optional: true },
 
     { key: "airTemp", label: "Air Temperature", type: "input", unit: "°F", decimals: 0, step: "1", section: "Weather" },
     { key: "windMph", label: "Wind", type: "input", unit: "mph", decimals: 0, step: "1", section: "Weather" },
@@ -88,6 +86,7 @@ TestDefinitions.workdayLog = {
 // A day covers every mix on the job: records entries gather the day's records from all its mixes and plants.
 //   section entry  a section of the day's Workday Log (progress = filled / total)
 //   records entry  the day's records of a test, with its add action; with doneKey, how many are done
+//   fields entry   the job's, and each placed mix's and plant's, own fields (entities[level].fields)
 const todaysCores = { records: "core", timeKey: "systemCreatedAt" };
 const todaysCoresRun = { ...todaysCores, doneKey: "coreGmb", doneLabel: "run", warnLabel: "cores not run" };
 const WorkdayLenses = {
@@ -102,6 +101,7 @@ const WorkdayLenses = {
       { label: "At the plant (morning)", icon: "🏭", entries: [
         { label: "Open plant", section: "Open Plant" },
         { label: "Plan with scale house and plant lab", section: "Plan" },
+        { label: "Mix & job info", fieldsOf: ["project", "mix", "plant"], placedKey: "mixesPlaced", placedLevel: "mix" },
         { label: "PQI setup", section: "PQI Setup" },
         { label: "Load up", section: "Load Up" }
       ] },
@@ -116,4 +116,25 @@ const WorkdayLenses = {
       ] }
     ]
   }
+};
+
+// Fields kept on the job, the mix and the plant themselves (entered once, shown on their pages and in the
+// "Mix & job info" entry). They fill the Red Book header.
+const LevelFields = {
+  project: [
+    { key: "stateProjectNumber", home: "project", label: "State Project Number", type: "text" },
+    { key: "roadName", home: "project", label: "Road", type: "text" },
+    { key: "sublotLengthFt", home: "project", label: "Sublot Length", type: "input", unit: "ft", decimals: 0, step: "1", optional: true }
+  ],
+  mix: [
+    { key: "mixDesignNumber", home: "mix", label: "Mix Design Number", type: "text" },
+    { key: "nominalSize", home: "mix", label: "Nominal Size", type: "select", options: ["3/8\"", "1/2\"", "3/4\"", "1\"", "1 1/2\""] },
+    { key: "layer", home: "mix", label: "Layer", type: "select", options: ["Surface", "Intermediate", "Binder", "Base", "Patching"] },
+    { key: "payItem", home: "mix", label: "Pay Item", type: "text" },
+    { key: "ratePerInch", home: "mix", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", instruction: "Rule of thumb 110; agencies vary." },
+    { key: "designGmm", home: "mix", label: "Mix Design Gmm", type: "input", unit: "", decimals: 3, step: "0.001", optional: true }
+  ],
+  plant: [
+    { key: "transitMinutes", home: "plant", label: "Haul Time, Plant to Job", type: "input", unit: "min", decimals: 0, step: "1", instruction: "Set once for the job. Every core on this plant uses it to find its Rice test." }
+  ]
 };

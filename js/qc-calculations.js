@@ -49,6 +49,7 @@ function valueOf(type, record, ctx, key) {
 function isStepFilled(type, record, ctx, step) {
   const value = valueOf(type, record, ctx, step.key);
   if (step.type === "check") return value === true;
+  if (Array.isArray(value)) return value.length > 0;
   return hasNumber(value) || (typeof value === "string" && value.trim() !== "");
 }
 // The day a lens looks at: the latest record of `window.type` in `scope` (by its start time) and its span,
@@ -205,8 +206,7 @@ function propagateHome(level, ctx, key) {
     }
   });
 }
-function propagateChange(type, ctx, key) {
-  const step = stepOf(type, key);
+function propagateChange(type, ctx, key, step = stepOf(type, key)) {
   if (step && step.home) propagateHome(step.home, ctx, key);
   else propagate(type, ctx.record, ctx, [key]);
 }

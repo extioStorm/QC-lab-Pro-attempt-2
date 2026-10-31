@@ -146,6 +146,11 @@ The Red Book and Diary need a day picker: choose a Workday Log, and the lens fil
    - Guidance (things to know or do, not record, like "dry the core") goes in a step's `instruction`, which Step Wizard pages show under the step and the Speed Sheet leaves out. No checkboxes or inputs for it. The Plan section's status / reason / expected start / changes / lab tech / communication fields became the Planned Mix instruction.
    - Lens entries are grouped: At the plant (morning), On the jobsite, Back at the plant.
    - PQI setup: target reading % (default 88) and offset in MTD units; replaces start/adjusted offset.
+2c. **Done (piece 2 of the job-level change):**
+   - Levels can declare their own `fields` (`DatabaseMap.entities[level].fields`, from `LevelFields` in `asphalt-roadway.js`), shown on the level's page and edited with the same row builder and handler (a field is a step with `home: <level>`). Job: state project number, road, sublot length. Mix: mix design number, nominal size, layer, pay item, rate per inch, design Gmm. Plant: haul time.
+   - Step type `multi`: tick any records of a level (`optionsFrom`) under the record's parent. The Plan section's "Mixes Placed Today" replaces "Planned Mix".
+   - Lens entry "Mix & job info" (`fieldsOf`): the job, then each mix placed today and its plant, each with filled/total; tapping opens that page. Each value is stored once on its own level.
+   - Not yet: expected thickness per mix (paving rate x mix's rate per inch), Gauge Standard Check record, Core # (pre-filled as one more than the highest Core # in that mix; typing over it is fine, the next one follows the highest).
 3. Mat Temp, Day Event, core field steps (including core kind, lot and sublot).
 4. Framework item 3 plus the Red Book and Diary lenses.
 5. Break the Mat (needs item 4) and Open Follow-ups.

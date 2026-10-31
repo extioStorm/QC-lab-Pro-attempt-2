@@ -6,26 +6,27 @@
 // Something the person entered changed `key`: recalculate everything that depends on it and save.
 // redraw: rebuild the screen (needed when the change alters what is shown, not just numbers).
 // reopen: open the inspector on `key` again after the redraw.
-function commitChange(key, { redraw = true, reopen = false } = {}) {
-  propagateChange(Nav.activeTestType, getActiveContext(), key);
+// step: the step that changed, when it is not one of the test on screen (a field of a level's own record).
+function commitChange(key, { redraw = true, reopen = false, step } = {}) {
+  propagateChange(Nav.activeTestType, getActiveContext(), key, step || stepOf(Nav.activeTestType, key));
   saveToStorage();
   if (!redraw) { updateCalculatedDisplays(); return; }
   renderScreen();
   if (reopen) reopenInspector(key);
 }
 
-// A value typed, ticked or picked on a step: a number for "input", true/false for "check", text otherwise.
-function handleScaleInput(fieldKey, rawValue) {
-  const ctx = getActiveContext();
-  if (!ctx.record) return;
-  const step = findStep(fieldKey);
-  const home = getStepHome(step) || ctx.record;
+// A value typed, ticked or picked on a step: a number for "input", true/false for "check", a list for "multi",
+// text otherwise. `step` defaults to the step of the test on screen; a level's own field passes its step.
+function handleScaleInput(fieldKey, rawValue, step = findStep(fieldKey)) {
+  const home = getStepHome(step);
+  if (!home) return;
   const type = step ? step.type : "input";
   const text = String(rawValue).trim();
   if (type === "check") home[fieldKey] = Boolean(rawValue);
+  else if (type === "multi") home[fieldKey] = rawValue.length ? rawValue : null;
   else if (text === "") home[fieldKey] = null;
   else home[fieldKey] = type === "input" ? parseFloat(text) : text;
-  commitChange(fieldKey, { redraw: Boolean(step && step.rerender) });
+  commitChange(fieldKey, { redraw: Boolean(step && step.rerender), step });
 }
 
 function handleDatetimeInput(fieldKey, rawValue) {

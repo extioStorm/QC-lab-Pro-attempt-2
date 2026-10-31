@@ -408,12 +408,9 @@ function buildLensEntryRow(entry, title, lens, scope, win, context, ctx) {
   });
 }
 // A lens entry for the levels' own fields (DatabaseMap.entities[level].fields), e.g. job info, then each mix
-// placed today and its plant: one row per record (filled/total; tap opens its page). With `placedKey`, only
-// records under a `placedLevel` record picked on the day's window record are listed.
+// and its plant: one row per record (filled/total; tap opens its page).
 function buildLensFieldsRow(entry, title, lens, scope, win, mark) {
-  const placed = entry.placedKey ? (win.record[entry.placedKey] || []) : null;
   const rows = entry.fieldsOf.flatMap(level => collectLevelRecords(lens.parent, scope, level)
-    .filter(found => !placed || level === lens.parent || placed.includes(found.ctx[entry.placedLevel][DatabaseMap.entities[entry.placedLevel].idKey]))
     .map(found => {
       const fields = (DatabaseMap.entities[level].fields || []).filter(field => !field.optional);
       const filled = fields.filter(field => isStepFilled(null, found.record, found.ctx, field)).length;
@@ -421,8 +418,8 @@ function buildLensFieldsRow(entry, title, lens, scope, win, mark) {
     }));
   const allFilled = rows.every(row => row.filled === row.total);
   return createTreeRow({
-    icon: mark(allFilled && (!placed || placed.length)),
-    title: `${title}${placed && !placed.length ? " · pick today's mixes in Plan" : ""}`,
+    icon: mark(allFilled),
+    title,
     getChildren: list => rows.forEach(({ level, found, filled, total }) => {
       const id = found.record[DatabaseMap.entities[level].idKey];
       list.appendChild(createTreeRow({

@@ -1,7 +1,7 @@
 // @ts-nocheck
 // Roadway workday records. Loaded after asphalt-defs.js (adds to TestDefinitions) and before
 // asphalt-schema.js (which reads TestDefinitions to build the tree).
-const DEFAULT_RATE_PER_INCH = 110;     // lb/yd² per inch compacted; a rule of thumb, kept on the mix
+const DEFAULT_RATE_PER_INCH = 110;     // lb/yd² per inch compacted; a rule of thumb, a default on each day's log
 const DEFAULT_SUBLOT_LENGTH_FT = 3000; // kept on the project
 const DEFAULT_PQI_TARGET_PERCENT = 88; // reading to calibrate to on uncompacted mat (older pavers)
 
@@ -14,7 +14,7 @@ TestDefinitions.workdayLog = {
   id: "workdayLog",
   title: "Workday Log",
   icon: "📅",
-  database: { parent: "project", collection: "workdayLogs", idKey: "workdayLogId", idPrefix: "DAY-", idPad: 2, defaults: { endedAt: null, weatherRecordedAt: null, pqiTargetPercent: DEFAULT_PQI_TARGET_PERCENT } },
+  database: { parent: "project", collection: "workdayLogs", idKey: "workdayLogId", idPrefix: "DAY-", idPad: 2, defaults: { endedAt: null, weatherRecordedAt: null, pqiTargetPercent: DEFAULT_PQI_TARGET_PERCENT, ratePerInch: DEFAULT_RATE_PER_INCH } },
   navigation: { group: true, groupIcon: "📅", collectionLabel: "Workday Logs", addLabel: "Start New Workday", itemLabel: (r, id) => `Workday ${shortStamp(r.startedAt)}${r.techName ? " · " + r.techName : ""}` },
   sequence: [
     { key: "techName", label: "Technician", type: "text", instruction: "Who is working today." },
@@ -34,7 +34,7 @@ TestDefinitions.workdayLog = {
     { key: "gaugeStandardChi", label: "Nuclear Gauge Standard CHI", type: "input", unit: "", decimals: 0, step: "any", section: "Open Plant", instruction: "Asphalt content gauge standard check.", optional: true },
     { key: "gaugeStandardCount", label: "Nuclear Gauge Standard Count", type: "input", unit: "", decimals: 0, step: "1", section: "Open Plant", instruction: "Standard number from the check.", optional: true },
 
-    { key: "mixesPlaced", label: "Which of this job's mixes were laid today?", type: "multi", optionsFrom: "mix", alsoCreate: ["plant"], section: "Plan", instruction: "Check with the scale house: the planned mix or mixes, whether the plant is running or on standby (and why), when production or shipping is expected to start, and any plan changes. Plans are expectations, not guarantees. Then go over it with the plant lab technician: re-verify, ask for anything newer, sort out differences, and agree how you'll keep in touch during the day (save their number in your phone). Tick every mix laid today, including patching." },
+    { key: "mixesPlaced", label: "Mixes Placed Today", type: "text", section: "Plan", instruction: "Check with the scale house: the planned mix or mixes, whether the plant is running or on standby (and why), when production or shipping is expected to start, and any plan changes. Plans are expectations, not guarantees. Then go over it with the plant lab technician: re-verify, ask for anything newer, sort out differences, and agree how you'll keep in touch during the day (save their number in your phone). List the mixes laid today as they go in the Red Book, including patching." },
 
     { key: "pqiTargetPercent", label: "Target Reading, Uncompacted Mat", type: "input", unit: "%", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "What the gauge is calibrated to read before rolling. 88% on older pavers; newer screeds may need up to about 91%." },
     { key: "pqiPresetMix", label: "Gauge Mix Preset", type: "text", section: "PQI Setup", instruction: "The mix preset selected on the gauge, so readings use consistent settings. The gauge also needs the mix's nominal size (on the mix's page, under Mix & job info)." },
@@ -63,9 +63,9 @@ TestDefinitions.workdayLog = {
     { key: "lane", label: "Lane", type: "select", options: ["Inner", "Outer"], section: "Jobsite Setup" },
     { key: "direction", label: "Direction", type: "text", section: "Jobsite Setup" },
     { key: "matWidth", label: "Mat Width", type: "input", unit: "ft", decimals: 1, step: "0.1", section: "Jobsite Setup" },
-    { key: "pavingRates", label: "Paving Rate", type: "perPick", of: "mixesPlaced", optionsFrom: "mix", unit: "lb/yd²", step: "1", section: "Jobsite Setup",
-      note: (mix, rate) => (hasNumber(rate) && mix.ratePerInch > 0 ? `≈ ${(rate / mix.ratePerInch).toFixed(2)} in lift: set the PQI depth to match` : `lb/yd² · ${mix.ratePerInch || DEFAULT_RATE_PER_INCH} per inch`),
-      instruction: "Ask the screed operator what rate they're setting. One line per mix laid today; only the mix you're coring matters for the PQI." },
+    { key: "pavingRate", label: "Paving Rate", type: "input", unit: "lb/yd²", decimals: 0, step: "1", section: "Jobsite Setup", instruction: "Ask the screed operator what rate they're setting, for the mix you're coring." },
+    { key: "ratePerInch", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", section: "Jobsite Setup", optional: true, instruction: "Rule of thumb 110; agencies vary." },
+    { key: "expectedLift", label: "Expected Lift (set PQI depth to match)", type: "computed", from: ["pavingRate", "ratePerInch"], calc: (rate, perInch) => (perInch > 0 ? rate / perInch : null), unit: "in", decimals: 2, section: "Jobsite Setup", instruction: "Paving rate / rate per inch." },
     { key: "rollingPattern", label: "Rolling Pattern", type: "text", section: "Jobsite Setup" },
     { key: "rollingPatternSet", label: "Roller operator pattern established", type: "check", section: "Jobsite Setup", optional: true },
     { key: "inspectorName", label: "Inspector Name", type: "text", section: "Jobsite Setup", optional: true },
@@ -104,7 +104,7 @@ const WorkdayLenses = {
       { label: "At the plant (morning)", icon: "🏭", entries: [
         { label: "Open plant", section: "Open Plant" },
         { label: "Plan with scale house and plant lab", section: "Plan" },
-        { label: "Mix & job info", fieldsOf: ["project", "mix", "plant"], placedKey: "mixesPlaced", placedLevel: "mix" },
+        { label: "Mix & job info", fieldsOf: ["project", "mix", "plant"] },
         { label: "PQI setup", section: "PQI Setup" },
         { label: "Load up", section: "Load Up" }
       ] },
@@ -134,7 +134,6 @@ const LevelFields = {
     { key: "mixDescription", home: "mix", label: "Mix (as written in the book)", type: "text", instruction: "As you write it on the Red Book's Mix line, e.g. 1/2\" ESAL C/D." },
     { key: "mixDesignNumber", home: "mix", label: "Mix Design Number", type: "text" },
     { key: "nominalSize", home: "mix", label: "Nominal Size", type: "select", options: ["3/8\"", "1/2\"", "3/4\"", "1\"", "1 1/2\""], instruction: "Entered into the PQI at setup; also explains texture and thin-lift trouble." },
-    { key: "ratePerInch", home: "mix", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", instruction: "Rule of thumb 110; agencies vary. Turns the paving rate into the lift thickness for the PQI depth." },
     { key: "payItem", home: "mix", label: "Pay Item", type: "text" },
     { key: "designGmm", home: "mix", label: "Mix Design Gmm", type: "input", unit: "", decimals: 3, step: "0.001", optional: true }
   ],

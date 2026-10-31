@@ -278,7 +278,7 @@ function renderPrereqSection(prereqSteps, record) {
 }
 
 // Steps whose control goes under the label (it needs the width), with the caption word for each.
-const BELOW_LABEL_STEPS = { datetime: "Date & time", choice: "Choose", text: "Text", select: "Pick one", multi: "Pick any", perPick: "One per pick" };
+const BELOW_LABEL_STEPS = { datetime: "Date & time", choice: "Choose", text: "Text", select: "Pick one" };
 
 // One step as a Speed Sheet row: a date/choice/text/pick gets its control under the label, a calculated
 // value is tappable to inspect, a number or a check box goes on the right. `withInstruction` (wizard pages)
@@ -439,70 +439,6 @@ function buildStepControl(step, record) {
     const options = [{ value: "", label: "— Choose —" }].concat((step.options || []).map(option => ({ value: option, label: option })))
       .map(option => ({ ...option, selected: option.value === current }));
     wrap.appendChild(buildSourceView({ options }, value => handleScaleInput(step.key, value, step)));
-  } else if (step.type === "perPick") {
-    // A number for each record picked in the `of` step (e.g. a paving rate per mix placed today), with the
-    // module's `note(option, value)` beside it.
-    const ctx = getActiveContext();
-    const parentLevel = DatabaseMap.tests[Nav.activeTestType].parent;
-    const picked = record[step.of] || [];
-    const values = home[step.key] || {};
-    const options = collectLevelRecords(parentLevel, ctx[parentLevel], step.optionsFrom)
-      .filter(({ record: option }) => picked.includes(option[DatabaseMap.entities[step.optionsFrom].idKey]));
-    if (!options.length) wrap.appendChild(el("div", "src-hint", "Pick today's mixes first."));
-    options.forEach(({ record: option }) => {
-      const id = option[DatabaseMap.entities[step.optionsFrom].idKey];
-      const input = el("input");
-      input.type = "number";
-      input.inputMode = "decimal";
-      input.step = step.step || "any";
-      input.dataset.option = id;
-      input.value = hasNumber(values[id]) ? values[id] : "";
-      input.onchange = () => {
-        const next = {};
-        wrap.querySelectorAll("input[data-option]").forEach(box => { if (box.value !== "") next[box.dataset.option] = parseFloat(box.value); });
-        handleScaleInput(step.key, next, { ...step, rerender: true });
-      };
-      const note = step.note ? step.note(option, values[id]) : "";
-      wrap.appendChild(buildRow({ label: getNodeTitle(step.optionsFrom, option, id), caption: note, control: input, className: "inset" }));
-    });
-  } else if (step.type === "multi") {
-    // Tick any of the records at level `optionsFrom` under this record's parent (e.g. the job's mixes).
-    const ctx = getActiveContext();
-    const parentLevel = DatabaseMap.tests[Nav.activeTestType].parent;
-    const picked = home[step.key] || [];
-    collectLevelRecords(parentLevel, ctx[parentLevel], step.optionsFrom).forEach(({ record: option }) => {
-      const id = option[DatabaseMap.entities[step.optionsFrom].idKey];
-      const line = el("label", "multi-option");
-      const box = el("input");
-      box.type = "checkbox";
-      box.value = id;
-      box.checked = picked.includes(id);
-      box.onchange = () => handleScaleInput(step.key, [...wrap.querySelectorAll("input:checked")].map(input => input.value), step);
-      line.append(box, el("span", "", getNodeTitle(step.optionsFrom, option, id)));
-      wrap.appendChild(line);
-    });
-    // The tree's own "add" actions, so a missing option can be made right here: the option's level, then each
-    // level in `alsoCreate` under it (e.g. a mix and its plant), asking for their names as the tree does.
-    const levels = [step.optionsFrom].concat(step.alsoCreate || []);
-    const actionFor = (parent, level) => ((DatabaseMap.tree[parent].holds.find(h => h.node === level) || {}).navigation);
-    const first = actionFor(parentLevel, step.optionsFrom);
-    if (first && first.create) {
-      const add = el("button", "btn-secondary btn-small", `➕ ${first.addLabel}`);
-      add.onclick = () => {
-        let parent = ctx[parentLevel], parentName = parentLevel;
-        for (const level of levels) {
-          const action = actionFor(parentName, level);
-          const values = action && collectNavigationValues(action);
-          if (!values) break;
-          parent = action.create(parent, values);
-          if (!parent) break;
-          parentName = level;
-        }
-        saveToStorage();
-        renderScreen();
-      };
-      wrap.appendChild(add);
-    }
   }
   return wrap;
 }

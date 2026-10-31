@@ -152,7 +152,7 @@ The Red Book and Diary need a day picker: choose a Workday Log, and the lens fil
    - "Mixes Placed Today" is a plain text field that goes straight into the Red Book (a tick list of the job's mixes was tried and dropped as confusing).
    - Lens entry "Mix & job info" (`fieldsOf`): the job, then each of its mixes and plants, each with filled/total; tapping opens that page. Each value is stored once on its own level.
    - Mix "Layer" / "Mix Type" pick lists were dropped; the mix is one "Mix (as written in the book)" text field. PQI offset reason removed. PQI setup gained gauge mix preset and gauge depth.
-   - Paving rate is one field on the day (the mix being cored, asked of the screed operator); rate per inch is a day-log default of 110 (toolbox); expected lift = rate / rate per inch, to set the PQI depth.
+   - Paving rate (asked of the screed operator) and rate per inch (default 110, toolbox; essentially never changes) live on each mix. The mix page shows expected lift = rate / rate per inch, to set the PQI depth; a calculated level field is worked out when drawn, never stored.
    - Later: use nominal size, binder vs surface and paving rate to suggest rolling patterns (vibratory passes).
    - Not yet: Gauge Standard Check record, Core # (pre-filled as one more than the highest Core # in that mix; typing over it is fine, the next one follows the highest).
 3. Mat Temp, Day Event, core field steps (including core kind, lot and sublot).

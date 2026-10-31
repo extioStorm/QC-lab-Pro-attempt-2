@@ -107,7 +107,7 @@ function renderLanding(container) {
   const id = record[def.idKey], title = getNodeTitle(level, record, id);
   setContextBar(`${getNodeIcon(level)} ${title}`);
   const card = buildCard(`${getNodeIcon(level)} ${title}`, `${def.label || level}. Pick something in the tree, or use the actions below.`);
-  (def.fields || []).forEach(field => card.appendChild(buildStepRow(field, record)));
+  appendSectionSteps(card, [{ name: "", steps: def.fields || [] }], record);
   (DatabaseMap.tree[level].holds || []).forEach(h => {
     const collection = h.collection || DatabaseMap.tests[h.test].collection;
     const label = h.node
@@ -292,6 +292,12 @@ function buildStepRowControls(step, record, className) {
   const base = { label: step.label, stepKey: step.key, className };
   if (BELOW_LABEL_STEPS[step.type]) {
     return buildRow({ ...base, caption: `${step.key} • ${BELOW_LABEL_STEPS[step.type]}`, below: buildStepControl(step, record) });
+  }
+  if (step.type === "computed" && step.home) {
+    // A calculated field of a level's own record (no override, nothing stored): worked out when drawn.
+    const values = step.from.map(key => record[key]);
+    const value = values.every(hasNumber) ? roundHalfToEven(step.calc(...values.map(Number)), step.decimals) : null;
+    return buildRow({ ...base, caption: `${step.key} • Calculated (${step.unit || "val"})`, value: formatValue(value, step.decimals), valueClass: "static" });
   }
   if (step.type === "computed") {
     const row = buildRow({

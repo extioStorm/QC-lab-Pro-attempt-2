@@ -412,7 +412,7 @@ function buildLensEntryRow(entry, title, lens, scope, win, context, ctx) {
 function buildLensFieldsRow(entry, title, lens, scope, win, mark) {
   const rows = entry.fieldsOf.flatMap(level => collectLevelRecords(lens.parent, scope, level)
     .map(found => {
-      const fields = (DatabaseMap.entities[level].fields || []).filter(field => !field.optional);
+      const fields = (DatabaseMap.entities[level].fields || []).filter(field => !field.optional && field.type !== "computed");
       const filled = fields.filter(field => isStepFilled(null, found.record, found.ctx, field)).length;
       return { level, found, filled, total: fields.length };
     }));

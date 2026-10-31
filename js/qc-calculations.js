@@ -114,9 +114,19 @@ function recomputeRecord(type, record, ctx) {
   }
   return allChangedKeys;
 }
+// A level's references to records kept beside the projects (entities[level].refs: { name: { key, type } }):
+// the referenced record goes into the context under `name`, like a level above (e.g. a job's mix -> its
+// company mix design), so `home` steps and policies can read it.
+function addRefs(level, record, ctx) {
+  Object.entries((DatabaseMap.entities[level] || {}).refs || {}).forEach(([name, ref]) => {
+    const list = appDb[DatabaseMap.tests[ref.type].collection] || {};
+    ctx[name] = (record && list[record[ref.key]]) || null;
+  });
+  return ctx;
+}
 function walkRecords(node, obj, ctx, fn) {
   if (!obj) return;
-  const here = Object.assign({}, ctx, { [node]: obj });
+  const here = addRefs(node, obj, Object.assign({}, ctx, { [node]: obj }));
   const holds = (DatabaseMap.tree[node] && DatabaseMap.tree[node].holds) || [];
   const descendants = holds.filter(hold => hold.node).map(hold => hold.node);
   while (descendants.length) {
@@ -198,12 +208,17 @@ function recalculateDeclaredViews(ctx) {
     if (scope) calculateView(view, scope, ctx);
   });
 }
+// A value kept on a level (or on a referenced record) changed: recalculate the records that use it. Changing a
+// reference itself (e.g. which design a mix uses) recalculates every record under that level.
 function propagateHome(level, ctx, key) {
-  walkRecords(level, ctx[level], ctx, (t, rec, c) => {
-    if (Deps.usedBy[t] && Deps.usedBy[t][key]) {
-      propagate(t, rec, c, [key]);
-    }
-  });
+  const isRef = Object.values((DatabaseMap.entities[level] || {}).refs || {}).some(ref => ref.key === key);
+  const visit = (t, rec, c) => {
+    if (c[level] !== ctx[level]) return;
+    if (isRef) propagate(t, rec, c, []);
+    else if (Deps.usedBy[t] && Deps.usedBy[t][key]) propagate(t, rec, c, [key]);
+  };
+  if (DatabaseMap.tree[level]) walkRecords(level, ctx[level], ctx, visit);
+  else Object.values(appDb[DatabaseMap.rootCollection] || {}).forEach(root => walkRecords(DatabaseMap.rootEntity, root, {}, visit));
 }
 function propagateChange(type, ctx, key, step = stepOf(type, key)) {
   if (step && step.home) propagateHome(step.home, ctx, key);

@@ -1,6 +1,7 @@
 // @ts-nocheck
 const DEFAULT_DRYBACK_CORRECTION = 0.005;
 const DEFAULT_HAUL_MINUTES = 30;
+const DEFAULT_RATE_PER_INCH = 110; // lb/yd² per inch compacted; a rule of thumb, a default on each mix design
 
 const T166 = {
   volume:  (ssd, submerged) => ssd - submerged,
@@ -9,6 +10,21 @@ const T166 = {
 };
 
 const TestDefinitions = {
+  // A company mix design (an asset kept beside the projects): entered once, used by every job's mix that picks it.
+  mixDesign: {
+    id: "mixDesign",
+    title: "Mix Design",
+    icon: "📄",
+    database: { parent: "top", collection: "mixDesigns", idKey: "mixDesignId", idPrefix: "MD-", idPad: 2, defaults: { ratePerInch: DEFAULT_RATE_PER_INCH } },
+    navigation: { group: true, groupIcon: "📄", collectionLabel: "Mix Designs", addLabel: "Add Mix Design", itemLabel: (r, id) => r.mixDescription || `Mix Design ${id}` },
+    sequence: [
+      { key: "mixDescription", label: "Mix (as written in the book)", type: "text", instruction: "As you write it on the Red Book's Mix line, e.g. 1/2\" ESAL C/D." },
+      { key: "mixDesignNumber", label: "Mix Design Number", type: "text" },
+      { key: "nominalSize", label: "Nominal Size", type: "select", options: ["3/8\"", "1/2\"", "3/4\"", "1\"", "1 1/2\""], instruction: "Keyed into the PQI at setup; also explains texture and thin-lift trouble." },
+      { key: "designGmm", label: "Mix Design Gmm", type: "input", unit: "", decimals: 3, step: "0.001", instruction: "Cores fall back on it when no Rice test fits." },
+      { key: "ratePerInch", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", optional: true, instruction: "Rule of thumb 110." }
+    ]
+  },
   rice: {
     id: "rice",
     title: "Rice Test (Gmm)",
@@ -200,7 +216,7 @@ const TestDefinitions = {
       },
       {
         key: "designGmm",
-        home: "mix",
+        home: "mixDesign",
         label: "Mix Design Gmm (fallback)",
         type: "input",
         unit: "",

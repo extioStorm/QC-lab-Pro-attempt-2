@@ -62,6 +62,7 @@ function getActiveContext() {
     const record = collection[id];
     if (!record) break;
     ctx[level] = record;
+    addRefs(level, record, ctx);
     const possibleChildren = (DatabaseMap.tree[level] && DatabaseMap.tree[level].holds || []).filter(hold => hold.node);
     const next = possibleChildren.find(hold => {
       const child = DatabaseMap.entities[hold.node];
@@ -82,9 +83,10 @@ function getActiveContext() {
   return ctx;
 }
 function getActiveRecord()  { return getActiveContext().record; }
+// Where a step's value is kept: its `home` level (null while that level has no record), else the open record.
 function getStepHome(step) {
   const ctx = getActiveContext();
-  if (step && step.home && ctx[step.home]) return ctx[step.home];
+  if (step && step.home) return ctx[step.home] || null;
   return ctx.record;
 }
 // A step of the test on screen.
@@ -433,20 +435,39 @@ function buildLensFieldsRow(entry, title, lens, scope, win, mark) {
     })
   });
 }
-// Flat lists beside the projects (tests with database.parent "top", e.g. company equipment): one group each,
-// drawn with the same rows as the tree.
+// Company assets: flat lists beside the projects (tests with database.parent "top"), one group each, drawn
+// with the same rows as the tree. A test's navigation.assetGroup puts it inside a group row (e.g. Equipment).
 function renderTopLists(container) {
-  Object.entries(DatabaseMap.tests).filter(([, test]) => test.parent === "top").forEach(([type, test]) => {
-    const nav = TestDefinitions[type].navigation || {};
+  const lists = Object.keys(DatabaseMap.tests).filter(type => DatabaseMap.tests[type].parent === "top");
+  if (!lists.length) return;
+  container.appendChild(el("div", "section-label", "🏢 Company Assets"));
+  const groupOf = type => (TestDefinitions[type].navigation || {}).assetGroup;
+  const drawnGroups = new Set();
+  lists.forEach(type => {
+    const group = groupOf(type);
+    if (!group) { container.appendChild(buildTopListRow(type)); return; }
+    if (drawnGroups.has(group)) return;
+    drawnGroups.add(group);
+    const members = lists.filter(t => groupOf(t) === group);
     container.appendChild(createTreeRow({
-      icon: nav.groupIcon || TestDefinitions[type].icon || "📄",
-      title: `${nav.collectionLabel || TestDefinitions[type].title} (${Object.keys(appDb[test.collection] || {}).length})`,
-      isOpen: Nav.activeTestType === type,
-      getChildren: rows => {
-        Object.values(appDb[test.collection] || {}).forEach(record => rows.appendChild(buildTestRecordRow(type, record, {}, true)));
-        rows.appendChild(buildTestAddRow(type, appDb, {}));
-      }
+      icon: "🧰",
+      title: group,
+      isOpen: members.includes(Nav.activeTestType),
+      getChildren: rows => members.forEach(t => rows.appendChild(buildTopListRow(t)))
     }));
+  });
+}
+// One company list as a group row: its records and the add action.
+function buildTopListRow(type) {
+  const test = DatabaseMap.tests[type], nav = TestDefinitions[type].navigation || {};
+  return createTreeRow({
+    icon: nav.groupIcon || TestDefinitions[type].icon || "📄",
+    title: `${nav.collectionLabel || TestDefinitions[type].title} (${Object.keys(appDb[test.collection] || {}).length})`,
+    isOpen: Nav.activeTestType === type,
+    getChildren: rows => {
+      Object.values(appDb[test.collection] || {}).forEach(record => rows.appendChild(buildTestRecordRow(type, record, {}, true)));
+      rows.appendChild(buildTestAddRow(type, appDb, {}));
+    }
   });
 }
 function renderRecursiveNode(levelType, obj, id, container, parentContext = {}) {

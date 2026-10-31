@@ -9,7 +9,7 @@ Field and lab app for asphalt technicians: plant samples, Rice (Gmm), gyratory p
 4. **Reuse before writing.** Extend existing helpers instead of duplicating: `createTestRecord`, `hasNumber`, `commitChange`, `buildRow`, `buildSourceView`, `buildCard`, `renderDeclaredView`, `computeStep`, `buildStepControl`, `navigateTo`, `jumpToStep`, `createTreeRow`. Before adding any function, search the repo for one that already does the job.
 5. **A new record type should only need a test definition in the module.** Record shape, navigation entry and screens come from it.
 
-Data tree today: project -> mix -> plant -> sample, with cores under plant. There is no date/shift level; "the day" is a lens that groups timestamped records by time window.
+Data tree today: the data object is the company. Beside the projects sit company assets (flat lists: mix designs, and equipment such as pavers). Projects nest project -> mix (this job's use of a company mix design, by reference) -> plant ("this mix as produced at this plant") -> samples, placements and cores. Workday logs sit under the project. There is no date/shift level; "the day" is a lens that groups timestamped records by time window. The data object models physical reality first.
 
 ## File layout
 Plain static site: no build step, no framework, scripts loaded in order by `index.html`.

@@ -168,10 +168,21 @@ function renderSetupForm(container) {
     (setup.fields || []).forEach(field => {
       const group = el("div", "field-group");
       group.appendChild(el("label", "", field.label));
-      const input = el("input");
-      input.type = field.type || "text";
+      let input;
+      if (field.optionsFrom) {
+        // Pick an existing record of a test (e.g. a company mix design), or leave it on `newLabel`.
+        const source = DatabaseMap.tests[field.optionsFrom];
+        input = el("select", "step-select");
+        input.appendChild(Object.assign(el("option", "", field.newLabel || "— None —"), { value: "" }));
+        Object.values(appDb[source.collection] || {}).forEach(option => {
+          input.appendChild(Object.assign(el("option", "", testRecordTitle(field.optionsFrom, option, option[source.idKey])), { value: option[source.idKey] }));
+        });
+      } else {
+        input = el("input");
+        input.type = field.type || "text";
+        input.placeholder = field.placeholder || "";
+      }
       input.id = `setup-${field.key}`;
-      input.placeholder = field.placeholder || "";
       group.appendChild(input);
       card.appendChild(group);
     });
@@ -262,7 +273,7 @@ function buildFoldBox(title, preview, openKey) {
 function renderPrereqSection(prereqSteps, record) {
   // Build condensed summary line of current values
   const previews = prereqSteps.map(s => {
-    const home = getStepHome(s) || record;
+    const home = getStepHome(s) || {};
     let v;
     if (s.type === "computed") v = formatValue(record[s.key], s.decimals);
     else if (s.type === "choice") {   // show what is chosen, not the stored choice object
@@ -409,7 +420,8 @@ function renderWizardMode(container) {
 
 function buildStepControl(step, record) {
   const wrap = el("div", "step-control");
-  const home = getStepHome(step) || record;
+  const missingHome = Boolean(step.home && !getStepHome(step));
+  const home = getStepHome(step) || {};
   if (step.type === "input") {
     const input = el("input");
     input.type = "number";
@@ -453,6 +465,11 @@ function buildStepControl(step, record) {
       const note = step.note(record);
       if (note) wrap.appendChild(el("div", "src-hint", note));
     }
+  }
+  if (missingHome) {
+    // The level this value lives on isn't there yet (e.g. no mix design picked): nothing to edit.
+    wrap.querySelectorAll("input, select").forEach(control => { control.disabled = true; });
+    wrap.appendChild(el("div", "src-hint", `Needs a ${(TestDefinitions[step.home] || DatabaseMap.entities[step.home] || {}).title || (DatabaseMap.entities[step.home] || {}).label || step.home}`));
   }
   return wrap;
 }

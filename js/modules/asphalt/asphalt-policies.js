@@ -59,7 +59,7 @@ const PolicyConfigs = {
     myTimestampKey: "laydownTimestamp",
     eventAutoKey: "isUsingAutoTime",
     offsetMinutesKey: "transitMinutes",
-    fallbackLevel: "mix",
+    fallbackLevel: "mixDesign",
     fallbackKey: "designGmm",
     choiceKey: "riceChoice",
     resultKey: "targetRiceGmm",

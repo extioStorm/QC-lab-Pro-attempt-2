@@ -5,7 +5,7 @@ const DatabaseMap = {
   storage: { databaseKey: "qc_asphalt_db", navigationKey: "qc_asphalt_nav" },
   entities: {
     project: { label: "Project", idKey: "projectId", navKey: "projectId", titleKey: "projectName", fields: LevelFields.project, icon: "📁", navigationTitle: (r, id) => `${id}: ${r.projectName || "Unnamed Project"}` },
-    mix:     { label: "Mix Design", idKey: "mixId", navKey: "mixId", titleKey: "mixName", fields: LevelFields.mix, icon: "🥣", navigationTitle: (r, id) => r.mixName || id },
+    mix:     { label: "Mix", idKey: "mixId", navKey: "mixId", titleKey: "mixName", refs: { mixDesign: { key: "designId", type: "mixDesign" } }, fields: LevelFields.mix, icon: "🥣", navigationTitle: (r, id) => r.mixName || id },
     plant:   { label: "Plant", idKey: "plantId", navKey: "plantId", titleKey: "plantName", fields: LevelFields.plant, icon: "🏭", navigationTitle: (r, id) => r.plantName || id },
     sample:  { label: "Truck Sample", idKey: "sampleId", navKey: "sampleId", titleKey: "timestamp", icon: "🕒", navigationTitle: (r, id) => `Sample @ ${shortStamp(r.timestamp || r.sampleId || id)}` }
   },
@@ -19,13 +19,13 @@ const DatabaseMap = {
       collection: "mixes",
       node: "mix",
       navigation: {
-        addLabel: "Add New Mix Design",
-        fields: [{ key: "name", prompt: "Enter Mix Design Name:", required: true }],
-        requiredMessage: "A mix design name is required.",
+        addLabel: "Add Mix to This Job",
+        fields: [{ key: "name", prompt: "Enter a name for this mix on this job:", required: true }],
+        requiredMessage: "A mix name is required.",
         clearNav: ["plantId", "sampleId", "activeTestType", "activeTestId"],
         create: (project, values) => {
           const id = `MIX-${nextNumber(project.mixes)}`;
-          return createDatabaseRecord(project, "mixes", id, { mixId: id, mixName: values.name, designGmm: null, ratePerInch: DEFAULT_RATE_PER_INCH, plants: {} });
+          return createDatabaseRecord(project, "mixes", id, { mixId: id, mixName: values.name, designId: values.designId || null, plants: {} });
         }
       }
     }] },
@@ -91,15 +91,20 @@ const DatabaseMap = {
     fields: [
       { key: "jobId", label: "Job / Contract #:", placeholder: "e.g. JOB-2026-A" },
       { key: "jobName", label: "Project Name / Location:", placeholder: "e.g. Hwy 41 Resurfacing" },
-      { key: "mixName", label: "Mix Design Name:", placeholder: "e.g. 9.5mm Superpave" },
+      { key: "designId", label: "Mix Design:", optionsFrom: "mixDesign", newLabel: "➕ New mix design (named below)" },
+      { key: "mixName", label: "Mix Name:", placeholder: "e.g. 1/2\" ESAL C/D" },
       { key: "plantName", label: "Plant Facility Name:", placeholder: "e.g. North Drum Plant" }
     ],
     // Builds project > mix > plant with the same "add" actions the navigation tree uses, and selects what it made.
+    // The mix uses the picked company mix design, or a new one named after the mix.
     create: (db, values) => {
       const childAction = (level, node) => DatabaseMap.tree[level].holds.find(hold => hold.node === node).navigation;
       const jobId = values.jobId.trim();
       const project = DatabaseMap.rootNavigation.create(db, { jobId, projectName: values.jobName.trim() || jobId });
-      const mix = childAction("project", "mix").create(project, { name: values.mixName.trim() || "Surface Mix" });
+      const design = db.mixDesigns && db.mixDesigns[values.designId];
+      const mixName = values.mixName.trim() || (design && design.mixDescription) || "Surface Mix";
+      const designId = design ? values.designId : createTestRecord("mixDesign", db, { mixDescription: mixName }).mixDesignId;
+      const mix = childAction("project", "mix").create(project, { name: mixName, designId });
       const plant = childAction("mix", "plant").create(mix, { name: values.plantName.trim() || "Main Plant" });
       return { projectId: project.projectId, mixId: mix.mixId, plantId: plant.plantId, sampleId: null, activeTestType: null, activeTestId: null };
     }

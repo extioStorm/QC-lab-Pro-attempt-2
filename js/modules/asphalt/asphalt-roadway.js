@@ -1,7 +1,6 @@
 // @ts-nocheck
 // Roadway workday records. Loaded after asphalt-defs.js (adds to TestDefinitions) and before
 // asphalt-schema.js (which reads TestDefinitions to build the tree).
-const DEFAULT_RATE_PER_INCH = 110;     // lb/yd² per inch compacted; a rule of thumb, a default on each mix
 const DEFAULT_SUBLOT_LENGTH_FT = 3000; // kept on the project
 const DEFAULT_PQI_TARGET_PERCENT = 88; // reading to calibrate to on uncompacted mat (older pavers)
 
@@ -81,7 +80,7 @@ TestDefinitions.placement = {
   sequence: [
     { key: "placedAt", label: "Placed On", type: "datetime", autoKey: "isUsingAutoTime", autoValueKey: "systemCreatedAt", autoHint: "automatic", manualHint: "entered", rerender: true, instruction: "When this mix started going down." },
     { key: "pavingRate", label: "Paving Rate", type: "input", unit: "lb/yd²", decimals: 0, step: "1", instruction: "Ask the screed operator what rate they're setting." },
-    { key: "ratePerInch", home: "mix", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", instruction: "Kept on the mix; rule of thumb 110." },
+    { key: "ratePerInch", home: "mixDesign", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", instruction: "Kept on the mix design; rule of thumb 110." },
     { key: "expectedLift", label: "Expected Lift (set PQI depth to match)", type: "computed", from: ["pavingRate", "ratePerInch"], calc: (rate, perInch) => (perInch > 0 ? rate / perInch : null), unit: "in", decimals: 2, instruction: "Paving rate / rate per inch." },
     { key: "paverId", label: "Paver", type: "select", optionsFrom: "paver", rerender: true, instruction: "Pick the paver laying this mix (add it once under Company Lists). Pavers prepack consistently, so last time's calibration is a good start.", note: lastPaverCalibration },
     { key: "pqiTargetPercent", label: "Target Reading, Uncompacted Mat", type: "input", unit: "%", decimals: 1, step: "0.1", instruction: "Worked out on the job: what the gauge is calibrated to read before rolling. 88% on older pavers; newer screeds may need up to about 91%." },
@@ -105,7 +104,7 @@ TestDefinitions.paver = {
   title: "Paver",
   icon: "🚜",
   database: { parent: "top", collection: "pavers", idKey: "paverId", idPrefix: "PAV-", idPad: 2 },
-  navigation: { group: true, groupIcon: "🚜", collectionLabel: "Pavers", addLabel: "Add Paver", itemLabel: (r, id) => r.paverName || `Paver ${id}` },
+  navigation: { group: true, groupIcon: "🚜", assetGroup: "Equipment", collectionLabel: "Pavers", addLabel: "Add Paver", itemLabel: (r, id) => r.paverName || `Paver ${id}` },
   sequence: [
     { key: "paverName", label: "Paver (name / number)", type: "text" },
     { key: "screed", label: "Screed", type: "text", instruction: "Model / age; older screeds often read about 88% before rolling, newer up to about 91%." },
@@ -160,7 +159,7 @@ const WorkdayLenses = {
   }
 };
 
-// Fields kept on the job, the mix and the plant themselves (entered once, shown on their pages and in the
+// Fields kept on the job, the job's mix and the plant themselves (design facts live on the company mix design) (entered once, shown on their pages and in the
 // "Mix & job info" entry). A field exists only if it feeds the Red Book, the Diary, the PQI or a calculation,
 // or is a tool the technician asked for (toolbox); anything else is an instruction or nothing.
 const LevelFields = {
@@ -170,12 +169,8 @@ const LevelFields = {
     { key: "sublotLengthFt", home: "project", label: "Sublot Length", type: "input", unit: "ft", decimals: 0, step: "1", optional: true }
   ],
   mix: [
-    { key: "mixDescription", home: "mix", label: "Mix (as written in the book)", type: "text", instruction: "As you write it on the Red Book's Mix line, e.g. 1/2\" ESAL C/D." },
-    { key: "mixDesignNumber", home: "mix", label: "Mix Design Number", type: "text" },
-    { key: "ratePerInch", home: "mix", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", rerender: true, optional: true, instruction: "Rule of thumb 110." },
-    { key: "nominalSize", home: "mix", label: "Nominal Size", type: "select", options: ["3/8\"", "1/2\"", "3/4\"", "1\"", "1 1/2\""], instruction: "Entered into the PQI at setup; also explains texture and thin-lift trouble." },
-    { key: "payItem", home: "mix", label: "Pay Item", type: "text" },
-    { key: "designGmm", home: "mix", label: "Mix Design Gmm", type: "input", unit: "", decimals: 3, step: "0.001", optional: true }
+    { key: "designId", home: "mix", label: "Mix Design", type: "select", optionsFrom: "mixDesign", rerender: true, instruction: "The company mix design this job's mix uses (add designs under Company Assets)." },
+    { key: "payItem", home: "mix", label: "Pay Item", type: "text" }
   ],
   plant: [
     { key: "transitMinutes", home: "plant", label: "Haul Time, Plant to Job", type: "input", unit: "min", decimals: 0, step: "1", instruction: "Set once for the job. Every core on this plant uses it to find its Rice test." }

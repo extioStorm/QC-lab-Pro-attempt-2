@@ -14,7 +14,7 @@ TestDefinitions.workdayLog = {
   id: "workdayLog",
   title: "Workday Log",
   icon: "📅",
-  database: { parent: "project", collection: "workdayLogs", idKey: "workdayLogId", idPrefix: "DAY-", idPad: 2, defaults: { endedAt: null, weatherRecordedAt: null, pqiTargetPercent: DEFAULT_PQI_TARGET_PERCENT } },
+  database: { parent: "project", collection: "workdayLogs", idKey: "workdayLogId", idPrefix: "DAY-", idPad: 2, defaults: { endedAt: null, weatherRecordedAt: null } },
   navigation: { group: true, groupIcon: "📅", collectionLabel: "Workday Logs", addLabel: "Start New Workday", itemLabel: (r, id) => `Workday ${shortStamp(r.startedAt)}${r.techName ? " · " + r.techName : ""}` },
   sequence: [
     { key: "techName", label: "Technician", type: "text", instruction: "Who is working today." },
@@ -36,14 +36,9 @@ TestDefinitions.workdayLog = {
 
     { key: "mixesPlaced", label: "Mixes Placed Today", type: "text", section: "Plan", instruction: "Check with the scale house: the planned mix or mixes, whether the plant is running or on standby (and why), when production or shipping is expected to start, and any plan changes. Plans are expectations, not guarantees. Then go over it with the plant lab technician: re-verify, ask for anything newer, sort out differences, and agree how you'll keep in touch during the day (save their number in your phone). List the mixes laid today as they go in the Red Book, including patching." },
 
-    { key: "pqiTargetPercent", label: "Target Reading, Uncompacted Mat", type: "input", unit: "%", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "What the gauge is calibrated to read before rolling. 88% on older pavers; newer screeds may need up to about 91%." },
     { key: "pqiPresetMix", label: "Gauge Mix Preset", type: "text", section: "PQI Setup", instruction: "The mix preset selected on the gauge, so readings use consistent settings." },
     { key: "pqiMixSize", label: "Gauge Mix Size", type: "select", options: ["3/8\"", "1/2\"", "3/4\"", "1\"", "1 1/2\""], section: "PQI Setup", instruction: "The mix (rock) size keyed into the gauge, for the mix you're coring." },
-    { key: "pqiDepth", label: "Gauge Depth", type: "input", unit: "in", decimals: 2, step: "0.25", section: "PQI Setup", instruction: "Depth set on the gauge; it matters relative to the lift thickness. The placement shows the expected lift (paving rate / 110)." },
-    { key: "pqiOffset", label: "Offset", type: "input", unit: "MTD", decimals: 1, step: "0.1", section: "PQI Setup", instruction: "In MTD units, + or -. A -4 offset turns a 145 reading into 141. Found by trial and error." },
-    { key: "pqiCalibrated", label: "PQI calibrated for this setup", type: "check", section: "PQI Setup", optional: true },
     { key: "pqiId", label: "PQI ID", type: "text", section: "PQI Setup", optional: true },
-    { key: "paverScreed", label: "Paver / Screed", type: "text", section: "PQI Setup", optional: true },
 
     ...checkSteps("Load Up", [
       ["trailerChecked", "Trailer hitch, pin, chains, lights"],
@@ -81,13 +76,18 @@ TestDefinitions.placement = {
   id: "placement",
   title: "Placement",
   icon: "🛤️",
-  database: { parent: "plant", collection: "placements", idKey: "placementId", idPrefix: "PL-", idPad: 2 },
+  database: { parent: "plant", collection: "placements", idKey: "placementId", idPrefix: "PL-", idPad: 2, defaults: { pqiTargetPercent: DEFAULT_PQI_TARGET_PERCENT } },
   navigation: { group: true, groupIcon: "🛤️", collectionLabel: "Placements", addLabel: "Log Placement", itemLabel: (r, id) => `Placement ${shortStamp(r.placedAt)}${r.beginStation ? " · " + r.beginStation + (r.endStation ? " to " + r.endStation : "") : ""}` },
   sequence: [
     { key: "placedAt", label: "Placed On", type: "datetime", autoKey: "isUsingAutoTime", autoValueKey: "systemCreatedAt", autoHint: "automatic", manualHint: "entered", rerender: true, instruction: "When this mix started going down." },
     { key: "pavingRate", label: "Paving Rate", type: "input", unit: "lb/yd²", decimals: 0, step: "1", instruction: "Ask the screed operator what rate they're setting." },
     { key: "ratePerInch", home: "mix", label: "Rate per Inch Compacted", type: "input", unit: "lb/yd²", decimals: 0, step: "1", instruction: "Kept on the mix; rule of thumb 110." },
     { key: "expectedLift", label: "Expected Lift (set PQI depth to match)", type: "computed", from: ["pavingRate", "ratePerInch"], calc: (rate, perInch) => (perInch > 0 ? rate / perInch : null), unit: "in", decimals: 2, instruction: "Paving rate / rate per inch." },
+    { key: "paverId", label: "Paver", type: "select", optionsFrom: "paver", rerender: true, instruction: "Pick the paver laying this mix (add it once under Company Lists). Pavers prepack consistently, so last time's calibration is a good start.", note: lastPaverCalibration },
+    { key: "pqiTargetPercent", label: "Target Reading, Uncompacted Mat", type: "input", unit: "%", decimals: 1, step: "0.1", instruction: "Worked out on the job: what the gauge is calibrated to read before rolling. 88% on older pavers; newer screeds may need up to about 91%." },
+    { key: "pqiOffset", label: "Offset", type: "input", unit: "MTD", decimals: 1, step: "0.1", instruction: "In MTD units, + or -. A -4 offset turns a 145 reading into 141. Found by trial and error." },
+    { key: "pqiDepth", label: "Gauge Depth", type: "input", unit: "in", decimals: 2, step: "0.25", instruction: "Depth set on the gauge; it matters relative to the lift thickness. Match the expected lift above." },
+    { key: "pqiCalibrated", label: "PQI calibrated for this paver", type: "check", optional: true },
     { key: "beginStation", label: "Begin Station", type: "text", instruction: "As written, e.g. 135+56." },
     { key: "endStation", label: "End Station", type: "text" },
     { key: "stationsRun", label: "Stations Run", type: "select", options: ["Increasing", "Decreasing"] },
@@ -98,6 +98,30 @@ TestDefinitions.placement = {
     { key: "rollingPatternSet", label: "Roller operator pattern established", type: "check", optional: true },
   ]
 };
+
+// Company equipment, kept beside the projects (database.parent "top") so it is entered once for every job.
+TestDefinitions.paver = {
+  id: "paver",
+  title: "Paver",
+  icon: "🚜",
+  database: { parent: "top", collection: "pavers", idKey: "paverId", idPrefix: "PAV-", idPad: 2 },
+  navigation: { group: true, groupIcon: "🚜", collectionLabel: "Pavers", addLabel: "Add Paver", itemLabel: (r, id) => r.paverName || `Paver ${id}` },
+  sequence: [
+    { key: "paverName", label: "Paver (name / number)", type: "text" },
+    { key: "screed", label: "Screed", type: "text", instruction: "Model / age; older screeds often read about 88% before rolling, newer up to about 91%." },
+    { key: "paverNotes", label: "Notes", type: "text", optional: true }
+  ]
+};
+// "Last time on this paver": the latest other placement (any job) that used it, with its target and offset.
+function lastPaverCalibration(placement) {
+  if (!placement || !placement.paverId) return "";
+  let last = null;
+  Object.values(appDb.projects || {}).forEach(project => walkRecords("project", project, {}, (type, record) => {
+    if (type === "placement" && record !== placement && record.paverId === placement.paverId && (!last || record.placedAt > last.placedAt)) last = record;
+  }));
+  if (!last) return "First time on this paver.";
+  return `Last time (${shortStamp(last.placedAt)}): target ${hasNumber(last.pqiTargetPercent) ? last.pqiTargetPercent + "%" : "--"}, offset ${hasNumber(last.pqiOffset) ? last.pqiOffset : "--"}`;
+}
 
 // The roadway technician's workday, in order and in groups. Drawn above the tree for the selected job (renderLensBlock).
 // A day covers every mix on the job: records entries gather the day's records from all its mixes and plants.

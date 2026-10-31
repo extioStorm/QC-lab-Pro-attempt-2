@@ -71,6 +71,8 @@ function getActiveContext() {
     collection = record[next.collection];
     level = next.node;
   }
+  // Flat lists kept beside the projects (a test whose database.parent is "top") live on the data object itself.
+  ctx.top = appDb;
   const testDefinition = DatabaseMap.tests[Nav.activeTestType];
   if (testDefinition && Nav.activeTestId) {
     const parent = ctx[testDefinition.parent];
@@ -431,6 +433,22 @@ function buildLensFieldsRow(entry, title, lens, scope, win, mark) {
     })
   });
 }
+// Flat lists beside the projects (tests with database.parent "top", e.g. company equipment): one group each,
+// drawn with the same rows as the tree.
+function renderTopLists(container) {
+  Object.entries(DatabaseMap.tests).filter(([, test]) => test.parent === "top").forEach(([type, test]) => {
+    const nav = TestDefinitions[type].navigation || {};
+    container.appendChild(createTreeRow({
+      icon: nav.groupIcon || TestDefinitions[type].icon || "📄",
+      title: `${nav.collectionLabel || TestDefinitions[type].title} (${Object.keys(appDb[test.collection] || {}).length})`,
+      isOpen: Nav.activeTestType === type,
+      getChildren: rows => {
+        Object.values(appDb[test.collection] || {}).forEach(record => rows.appendChild(buildTestRecordRow(type, record, {}, true)));
+        rows.appendChild(buildTestAddRow(type, appDb, {}));
+      }
+    }));
+  });
+}
 function renderRecursiveNode(levelType, obj, id, container, parentContext = {}) {
   const navKey = navKeyOf(levelType);
   const currentContext = Object.assign({}, parentContext, { [navKey]: id });
@@ -531,12 +549,14 @@ function renderDrawerContent() {
     </div>
     <div id="lens-root" class="lens-root"></div>
     <div id="tree-root"></div>
+    <div id="top-lists" class="drawer-section"></div>
     <div class="drawer-section">
       <div class="section-label">⚙️ Maintenance & Testing</div>
       <button class="btn-danger btn-small" onclick="resetDatabase()">🗑️ Reset Database (Start Fresh)</button>
     </div>
   `;
   renderLensBlock(document.getElementById("lens-root"));
+  renderTopLists(document.getElementById("top-lists"));
   const root = document.getElementById("tree-root");
   const rootRecords = appDb[DatabaseMap.rootCollection] || {};
   Object.keys(rootRecords).forEach(rootId => {

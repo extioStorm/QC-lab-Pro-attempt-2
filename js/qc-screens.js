@@ -441,10 +441,18 @@ function buildStepControl(step, record) {
     input.onchange = () => handleScaleInput(step.key, input.checked, step);
     wrap.appendChild(input);
   } else if (step.type === "select") {
+    // Fixed `options`, or `optionsFrom` a test's records (stores the record's id, shows its name).
     const current = home[step.key] ?? "";
-    const options = [{ value: "", label: "— Choose —" }].concat((step.options || []).map(option => ({ value: option, label: option })))
-      .map(option => ({ ...option, selected: option.value === current }));
+    const source = step.optionsFrom && DatabaseMap.tests[step.optionsFrom];
+    const choices = source
+      ? Object.values(getActiveContext()[source.parent][source.collection] || {}).map(option => ({ value: option[source.idKey], label: testRecordTitle(step.optionsFrom, option, option[source.idKey]) }))
+      : (step.options || []).map(option => ({ value: option, label: option }));
+    const options = [{ value: "", label: "— Choose —" }].concat(choices).map(option => ({ ...option, selected: option.value === current }));
     wrap.appendChild(buildSourceView({ options }, value => handleScaleInput(step.key, value, step)));
+    if (step.note) {
+      const note = step.note(record);
+      if (note) wrap.appendChild(el("div", "src-hint", note));
+    }
   }
   return wrap;
 }

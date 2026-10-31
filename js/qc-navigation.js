@@ -91,8 +91,9 @@ function getStepHome(step) {
 }
 // A step of the test on screen.
 function findStep(key) { return stepOf(Nav.activeTestType, key); }
+// Go somewhere. Leaving the workday lens is the default: a target that stays in it passes its own lensStep.
 function navigateTo(target, { keepDrawer = false } = {}) {
-  Object.assign(Nav, target);
+  Object.assign(Nav, { lensStep: null }, target);
   if (!keepDrawer) toggleDrawer(false);
   saveToStorage();
   renderScreen();
@@ -333,106 +334,6 @@ function buildTestAddRow(type, parent, context, label) {
       saveToStorage();
       openTestRecord(type, record[test.idKey], context);
     }
-  });
-}
-// The lens: the module's declared workday entries (DatabaseMap.lenses) for the selected `parent`, drawn above
-// the tree with the same rows and navigation. Progress is counted from the records every time it is drawn.
-function renderLensBlock(container) {
-  const lens = Object.values(DatabaseMap.lenses || {})[0];
-  const ctx = getActiveContext();
-  const scope = lens && ctx[lens.parent];
-  if (!scope) return;
-  const context = Object.assign(contextIds(ctx, lens.parent), selectionTarget(lens.parent, scope[DatabaseMap.entities[lens.parent].idKey]));
-  const win = currentWindow(scope, lens.window);
-  const windowTest = DatabaseMap.tests[lens.window.type];
-  container.appendChild(createTreeRow({
-    icon: lens.icon || "📋",
-    title: win ? `${lens.label} · ${testRecordTitle(lens.window.type, win.record, win.record[windowTest.idKey])}` : lens.label,
-    isOpen: true,
-    getChildren: rows => {
-      if (!win) { rows.appendChild(buildTestAddRow(lens.window.type, scope, context, lens.startLabel)); return; }
-      const numbers = new Map(lens.groups.flatMap(group => group.entries).map((entry, i) => [entry, i + 1]));
-      lens.groups.forEach(group => rows.appendChild(createTreeRow({
-        icon: group.icon || "📂",
-        title: group.label,
-        isOpen: true,
-        getChildren: groupRows => group.entries.forEach(entry => groupRows.appendChild(buildLensEntryRow(entry, `${numbers.get(entry)}. ${entry.label}`, lens, scope, win, context, ctx)))
-      })));
-    }
-  }));
-}
-// One lens entry: a section of the day's window record (filled/total), records in the window that still need
-// something (done/total; opens the first not done), or the window's records with the add action.
-function buildLensEntryRow(entry, title, lens, scope, win, context, ctx) {
-  const mark = done => (done ? "✅" : "▫️");
-  if (entry.fieldsOf) return buildLensFieldsRow(entry, title, lens, scope, win, mark);
-  if (entry.section) {
-    const type = lens.window.type;
-    // Only the steps that matter count; optional ones (the toolbox) never make a section unfinished.
-    const steps = TestDefinitions[type].sequence.filter(step => step.section === entry.section && step.type !== "computed" && !step.optional);
-    const filled = steps.filter(step => isStepFilled(type, win.record, ctx, step)).length;
-    const warning = entry.warn ? recordsInWindow(lens.parent, scope, entry.warn, win).notDone.length : 0;
-    return createTreeRow({
-      icon: steps.length ? mark(filled === steps.length) : "🧰",
-      title: `${title}${steps.length ? ` · ${filled}/${steps.length}` : ""}${warning ? ` · ⚠ ${entry.warn.warnLabel}: ${warning}` : ""}`,
-      isLeaf: true,
-      onSelect: () => openTestRecord(type, win.record[DatabaseMap.tests[type].idKey], context, {
-        mode: "INTERACTIVE",
-        stepIndex: Math.max(0, stepSections(TestDefinitions[type]).findIndex(section => section.name === entry.section))
-      })
-    });
-  }
-  const type = entry.records, test = DatabaseMap.tests[type];
-  const { records, notDone } = recordsInWindow(lens.parent, scope, entry, win);
-  // The Nav ids that open a record found under the lens's scope (it may sit under any mix / plant).
-  const contextOf = recordCtx => Object.assign(contextIds(recordCtx, null), selectionTarget(test.parent, recordCtx[test.parent][DatabaseMap.entities[test.parent].idKey]));
-  if (entry.doneKey) {
-    return createTreeRow({
-      icon: mark(records.length && !notDone.length),
-      title: `${title} · ${records.length - notDone.length} of ${records.length} ${entry.doneLabel}`,
-      isLeaf: true,
-      onSelect: () => { if (notDone.length) openTestRecord(type, notDone[0].record[test.idKey], contextOf(notDone[0].ctx)); }
-    });
-  }
-  return createTreeRow({
-    icon: TestDefinitions[type].icon || "📄",
-    title: `${title} · ${records.length}`,
-    getChildren: rows => {
-      records.forEach(found => rows.appendChild(buildTestRecordRow(type, found.record, contextOf(found.ctx), true)));
-      // One add row per place the record can go (e.g. each mix's plant), named by the levels in between.
-      const parents = collectLevelRecords(lens.parent, scope, test.parent);
-      const levels = Object.keys(DatabaseMap.entities);
-      parents.forEach(parent => {
-        const where = levels.slice(levels.indexOf(lens.parent) + 1, levels.indexOf(test.parent) + 1)
-          .map(level => getNodeTitle(level, parent.ctx[level], parent.ctx[level][DatabaseMap.entities[level].idKey])).join(" / ");
-        const label = `${(TestDefinitions[type].navigation || {}).addLabel || "Add"}${parents.length > 1 ? ` · ${where}` : ""}`;
-        rows.appendChild(buildTestAddRow(type, parent.record, contextOf(parent.ctx), label));
-      });
-    }
-  });
-}
-// A lens entry for the levels' own fields (DatabaseMap.entities[level].fields), e.g. job info, then each mix
-// and its plant: one row per record (filled/total; tap opens its page).
-function buildLensFieldsRow(entry, title, lens, scope, win, mark) {
-  const rows = entry.fieldsOf.flatMap(level => collectLevelRecords(lens.parent, scope, level)
-    .map(found => {
-      const fields = (DatabaseMap.entities[level].fields || []).filter(field => !field.optional && field.type !== "computed");
-      const filled = fields.filter(field => isStepFilled(null, found.record, found.ctx, field)).length;
-      return { level, found, filled, total: fields.length };
-    }));
-  const allFilled = rows.every(row => row.filled === row.total);
-  return createTreeRow({
-    icon: mark(allFilled),
-    title,
-    getChildren: list => rows.forEach(({ level, found, filled, total }) => {
-      const id = found.record[DatabaseMap.entities[level].idKey];
-      list.appendChild(createTreeRow({
-        icon: getNodeIcon(level),
-        title: `${getNodeTitle(level, found.record, id)} · ${filled}/${total}`,
-        isLeaf: true,
-        onSelect: () => navigateTo(Object.assign(contextIds(found.ctx, null), selectionTarget(level, id), NO_ACTIVE_TEST))
-      }));
-    })
   });
 }
 // Company assets: flat lists beside the projects (tests with database.parent "top"), one group each, drawn

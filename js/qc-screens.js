@@ -57,6 +57,10 @@ function renderScreen() {
   const container = document.getElementById("app-viewport");
   if (!container) return;
   container.innerHTML = "";
+  if (Nav.lensStep && Nav.lensStep.list) {
+    renderLensEntryPage(container);
+    return;
+  }
   const view = (DatabaseMap.views || {})[Nav.activeTestType];
   if (view) {
     renderDeclaredView(container, view);
@@ -122,6 +126,8 @@ function renderLanding(container) {
     add.onclick = () => { createNavigationChild(ref.relation, ref.parent, level); renderScreen(); };
     card.appendChild(add);
   }
+  const back = buildLensReturn();
+  if (back) card.appendChild(back);
   card.appendChild(buildDeleteButton(`🗑 Delete this ${def.label || level}`, () => deleteRecord(ref.parent, ref.collection, id, title, contextIds(ctx, level))));
   container.appendChild(card);
 }
@@ -381,9 +387,13 @@ function renderWizardMode(container) {
   if (sections.some(section => section.name)) {
     const index = Math.min(Nav.stepIndex, sections.length - 1);
     const section = sections[index];
-    const chunk = buildCard(`${index + 1} of ${sections.length}: ${section.name || testDef.title}`);
+    // Opened from the workday lens at this section: its heading and Back / Next follow the lens instead.
+    const lensPage = lensSectionPage(section.name);
+    const chunk = buildCard(lensPage ? lensPage.title : `${index + 1} of ${sections.length}: ${section.name || testDef.title}`);
     appendSectionSteps(chunk, [section], record, true);
-    chunk.appendChild(buildWizardNav(index, sections.length, `${sections[index + 1] ? sections[index + 1].name : ""} →`));
+    chunk.appendChild(lensPage ? lensPage.nav : buildWizardNav(index, sections.length, `${sections[index + 1] ? sections[index + 1].name : ""} →`));
+    const back = buildLensReturn();
+    if (back) chunk.appendChild(back);
     container.appendChild(chunk);
     return;
   }
@@ -415,6 +425,8 @@ function renderWizardMode(container) {
     if (missing) card.appendChild(missing);
   }
   card.appendChild(buildWizardNav(stepIndex, steps.length, "Next Step →"));
+  const back = buildLensReturn();
+  if (back) card.appendChild(back);
   container.appendChild(card);
 }
 

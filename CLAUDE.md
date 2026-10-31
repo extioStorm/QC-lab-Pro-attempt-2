@@ -14,7 +14,7 @@ Data tree today: the data object is the company. Beside the projects sit company
 ## File layout
 Plain static site: no build step, no framework, scripts loaded in order by `index.html`.
 - `js/modules/asphalt/`: `asphalt-defs.js`, `asphalt-policies.js`, `asphalt-schema.js` (module data; loaded first).
-- `js/qc-database.js` (data object, `createTestRecord`, `hasNumber`), `qc-policies.js`, `qc-calculations.js` (`computeStep`), `qc-navigation.js` (`navigateTo`, `jumpToStep`, `createTreeRow`), `qc-inspector.js` (`commitChange`), `qc-screens.js` (`buildRow`, `buildCard`, `buildSourceView`, `buildStepControl`, `renderDeclaredView`).
+- `js/qc-database.js` (data object, `createTestRecord`, `hasNumber`), `qc-policies.js`, `qc-calculations.js` (`computeStep`), `qc-navigation.js` (`navigateTo`, `jumpToStep`, `createTreeRow`), `qc-lens.js` (workday lens: menu block and lens pages, `describeLensEntry`), `qc-inspector.js` (`commitChange`), `qc-screens.js` (`buildRow`, `buildCard`, `buildSourceView`, `buildStepControl`, `renderDeclaredView`).
 - `css/styles.css`, `index.html`.
 New script files must be added to `index.html` in dependency order (module files before the framework files that read them, as today).
 

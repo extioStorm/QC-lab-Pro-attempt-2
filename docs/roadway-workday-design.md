@@ -104,6 +104,16 @@ Computed steps: PQI Gmb = PQI MTD / 62.2; **lab MTD = core Gmb x 62.2** (new; th
 ## Lenses (declared views; no double entry)
 The Red Book and Diary need a day picker: choose a Workday Log, and the lens filters records by that log's window.
 - **Red Book:** header (date, job, project, plant, mix), the core table grouped by sublot limits (core, station + offset, thickness, PQI % / lab %, PQI MTD / lab MTD, notes), paving details (begin/end station, lane, rolling pattern), unusual conditions from Day Events.
+- **Red Book core table (confirmed with the technician).** Two rows per core, values written without units:
+
+  | Core | PQI | Actual | Rice / Thick | Location |
+  |---|---|---|---|---|
+  | core # | PQI % | lab % | Rice Gmm used | station |
+  | station limits (sublot) | PQI MTD | lab MTD (Gmb x 62.2) | thickness | offset (from C/L or edge) |
+
+  The technician compares PQI to actual to decide on the gauge offset. The lens shows each core's PQI minus lab, and the day's average difference in MTD (for example "PQI reads 1.0 high on average, 3 cores"), as a hint only; the offset stays the technician's call. Computed, never stored.
+- **PQI offset** is in MTD units (+ or -; e.g. a -4 offset turns a 145 reading into 141), set by trial and error. 88% is the target reading on uncompacted mat (older pavers), not the offset. PQI setup fields become: target % (default 88), offset (MTD), reason, calibrated. Replaces "start offset / adjusted offset".
+- **Priority:** match the Roadway Book layout first; add the diary memo items after.
 - **Roadway Diary** (company QC diary list): technicians and hours, mixes placed + station limits, weather, problems, equipment and rolling pattern, density issues, visitors, communications, anything unusual. Output is text with a Copy button.
 - **Open Follow-ups** (plant-wide, no day picker): cores whose hole is not filled, cores not handed off, cores whose lay time is still automatic, lab results not yet recorded.
 

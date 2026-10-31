@@ -311,26 +311,24 @@ function renderSpeedMode(container) {
   const card = buildCard(`⚡ Speed Sheet — ${testDef.title.toUpperCase()} #${Nav.activeTestId}`);
   const prereqSteps = testDef.sequence.filter(isPrereqStep);
   if (prereqSteps.length > 0) card.appendChild(renderPrereqSection(prereqSteps, record));
-  appendSectionSteps(card, stepSections(testDef), record, `${Nav.activeTestType}:optional`);
+  appendSectionSteps(card, stepSections(testDef), record);
   container.appendChild(card);
 }
 
-// Lay sections of steps out on a card: each section's important steps open under its name, and the `optional`
-// ones (checklists, extra info) folded into one "Checklists & Optional Info" box, under their section names.
-// A single section made only of optional steps (a checklist page) is shown open.
-function appendSectionSteps(card, sections, record, openKey) {
-  const box = buildFoldBox("📋 Checklists & Optional Info", "", openKey);
-  const single = sections.length === 1;
+// Lay sections of steps out on a card, in order: the section's name (when there are several), then its
+// `optional` steps (checklists, extra info) folded into its own toolbox, then its steps that matter, open.
+// Toolboxes never open by themselves; nothing in them is required.
+function appendSectionSteps(card, sections, record) {
   sections.forEach(section => {
-    const showAll = single && section.steps.every(step => step.optional);
-    const open = section.steps.filter(step => showAll || !step.optional);
-    const folded = section.steps.filter(step => !showAll && step.optional);
-    if (open.length && section.name && !single) card.appendChild(el("div", "section-label", section.name));
-    open.forEach(step => card.appendChild(buildStepRow(step, record)));
-    if (folded.length && section.name && !single) box.body.appendChild(el("div", "section-label", section.name));
-    folded.forEach(step => box.body.appendChild(buildStepRow(step, record, "inset")));
+    if (section.name && sections.length > 1) card.appendChild(el("div", "section-label", section.name));
+    const optional = section.steps.filter(step => step.optional);
+    if (optional.length) {
+      const box = buildFoldBox(`🧰 ${section.name || "Optional"}: checklist & extras (${optional.length})`, "", `${Nav.activeTestType}:toolbox:${section.name}`);
+      optional.forEach(step => box.body.appendChild(buildStepRow(step, record, "inset")));
+      card.appendChild(box.details);
+    }
+    section.steps.filter(step => !step.optional).forEach(step => card.appendChild(buildStepRow(step, record)));
   });
-  if (box.body.children.length) card.appendChild(box.details);
 }
 
 // Back / Next between wizard pages.
@@ -360,7 +358,7 @@ function renderWizardMode(container) {
     const index = Math.min(Nav.stepIndex, sections.length - 1);
     const section = sections[index];
     const chunk = buildCard(`${index + 1} of ${sections.length}: ${section.name || testDef.title}`);
-    appendSectionSteps(chunk, [section], record, `${Nav.activeTestType}:optional:${section.name}`);
+    appendSectionSteps(chunk, [section], record);
     chunk.appendChild(buildWizardNav(index, sections.length, `${sections[index + 1] ? sections[index + 1].name : ""} →`));
     container.appendChild(chunk);
     return;

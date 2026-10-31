@@ -363,12 +363,13 @@ function buildLensEntryRow(entry, title, lens, scope, win, context, ctx) {
   const mark = done => (done ? "✅" : "▫️");
   if (entry.section) {
     const type = lens.window.type;
-    const steps = TestDefinitions[type].sequence.filter(step => step.section === entry.section && step.type !== "computed");
+    // Only the steps that matter count; optional ones (the toolbox) never make a section unfinished.
+    const steps = TestDefinitions[type].sequence.filter(step => step.section === entry.section && step.type !== "computed" && !step.optional);
     const filled = steps.filter(step => isStepFilled(type, win.record, ctx, step)).length;
     const warning = entry.warn ? recordsInWindow(scope, entry.warn, win).notDone.length : 0;
     return createTreeRow({
-      icon: mark(filled === steps.length),
-      title: `${title} · ${filled}/${steps.length}${warning ? ` · ⚠ ${entry.warn.warnLabel}: ${warning}` : ""}`,
+      icon: steps.length ? mark(filled === steps.length) : "🧰",
+      title: `${title}${steps.length ? ` · ${filled}/${steps.length}` : ""}${warning ? ` · ⚠ ${entry.warn.warnLabel}: ${warning}` : ""}`,
       isLeaf: true,
       onSelect: () => openTestRecord(type, win.record[DatabaseMap.tests[type].idKey], context, {
         mode: "INTERACTIVE",
